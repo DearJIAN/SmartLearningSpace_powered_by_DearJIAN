@@ -1,0 +1,60 @@
+# ==============================
+# 1. 核心系统垃圾与幽灵文件 (最重要)
+# ==============================
+nul
+**/nul
+smart-campus-backend/nul
+vue-demo/nul
+.DS_Store
+Thumbs.db
+
+# ==============================
+# 2. 全能 IDE 配置 (覆盖所有编辑器)
+# ==============================
+# JetBrains 全家桶 (IDEA, PyCharm, WebStorm 等都会产生这些)
+.idea/
+*.iws
+*.iml
+**/out/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# ==============================
+# 3. Java 后端 (Smart Campus)
+# ==============================
+**/target/
+**/*.class
+**/*.jar
+*.war
+*.ear
+# 如果你不希望上传 Maven 包装器，可以取消下面注释
+# .mvn/
+
+# ==============================
+# 4. Vue 前端 (Vue Demo)
+# ==============================
+**/node_modules/
+**/dist/
+npm-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ==============================
+# 5. Python/AI 子系统 (YOLO)
+# ==============================
+**/__pycache__/
+*.pyc
+.venv/
+venv/
+env/
+.env
+
+# YOLO 特有运行结果和模型
+**/runs/
+*.pt
+*.onnx
+
+
+my_yolo_web/example/

@@ -1,0 +1,5182 @@
+﻿
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\out\production\my_yolo_web\static\script.js ==========
+
+// static/script.js
+
+let pollingInterval = null;
+let isPaused = false;
+let myChart = null;
+let chartInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadModels();
+    loadExamples();
+    initChart();
+});
+
+// --- 【核心修改】ECharts 初始化与自适应 ---
+function initChart() {
+    const chartDom = document.getElementById('mainChart');
+    const chartContainer = document.getElementById('chartWindow'); // 获取外部容器
+
+    if(!chartDom) return;
+
+    myChart = echarts.init(chartDom);
+
+    const colors = [
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#83bff6'}, {offset: 0.5, color: '#188df0'}, {offset: 1, color: '#188df0'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#20bf55'}, {offset: 1, color: '#01baef'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#fbc2eb'}, {offset: 1, color: '#a6c1ee'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#ff9a9e'}, {offset: 1, color: '#fecfef'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#a18cd1'}, {offset: 1, color: '#fbc2eb'}])
+    ];
+
+    const option = {
+        title: { text: '实时类别统计', left: 'center' },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: [] },
+        yAxis: { type: 'value', minInterval: 1 },
+        series: [{
+            name: '数量', type: 'bar', data: [],
+            itemStyle: {
+                color: function(params) {
+                    return colors[params.dataIndex % colors.length];
+                },
+                borderRadius: [5, 5, 0, 0]
+            },
+            label: { show: true, position: 'top' }
+        }]
+    };
+    myChart.setOption(option);
+
+    // 【终极适配方案】使用 ResizeObserver 监听容器大小变化
+    // 只要 chartWindow 的 div 大小变了（不管是因为浏览器缩放，还是 CSS 媒体查询），图表都会自动重绘
+    const resizeObserver = new ResizeObserver(() => {
+        myChart.resize();
+    });
+
+    if (chartContainer) {
+        resizeObserver.observe(chartContainer);
+    }
+}
+
+function toggleChart() {
+    const win = document.getElementById('chartWindow');
+    if (win.style.display === 'flex') {
+        win.style.display = 'none';
+        if (chartInterval) clearInterval(chartInterval);
+    } else {
+        document.getElementById('chatWindow').style.display = 'none';
+        win.style.display = 'flex';
+        // 打开瞬间强制重绘一次，防止渲染错位
+        setTimeout(() => myChart.resize(), 50);
+        startChartPolling();
+    }
+}
+
+function startChartPolling() {
+    if (chartInterval) clearInterval(chartInterval);
+    updateChartData();
+    chartInterval = setInterval(updateChartData, 500);
+}
+
+function updateChartData() {
+    fetch('/api/stats')
+    .then(res => res.json())
+    .then(data => {
+        const categories = Object.keys(data);
+        const counts = Object.values(data);
+        myChart.setOption({ xAxis: { data: categories }, series: [{ data: counts }] });
+    })
+    .catch(err => console.error(err));
+}
+
+// --- 常规逻辑 ---
+function loadModels() {
+    fetch('/api/models').then(res => res.json()).then(files => {
+        const dataList = document.getElementById('modelOptions');
+        const inputPath = document.getElementById('modelInput');
+        if(dataList) {
+            dataList.innerHTML = "";
+            files.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                dataList.appendChild(opt);
+            });
+            if (files.length > 0 && inputPath && !inputPath.value) inputPath.value = files[0];
+        }
+    }).catch(err => console.error(err));
+}
+
+function loadExamples() {
+    fetch('/api/examples').then(res => res.json()).then(paths => {
+        const dataList = document.getElementById('pathOptions');
+        if(dataList) {
+            dataList.innerHTML = "";
+            paths.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                dataList.appendChild(opt);
+            });
+        }
+    });
+}
+
+function toggleInput(type) {
+    document.getElementById('pathInputGroup').style.display = (type === 'path') ? 'block' : 'none';
+}
+
+function clearResults() {
+    if(!confirm("确定要清空所有检测结果吗？")) return;
+    fetch('/api/clear_results', {method: 'POST'})
+    .then(res => res.json())
+    .then(data => { document.querySelector('#resultTable tbody').innerHTML = ""; });
+}
+
+function startSystem() {
+    const inputType = document.querySelector('input[name="inputType"]:checked').value;
+    const pathInput = document.getElementById('pathInput').value;
+    const modelInput = document.getElementById('modelInput').value;
+    if (inputType === 'path' && !pathInput) { alert("❌ 请输入或选择路径！"); return; }
+    if (!modelInput) { alert("❌ 请输入或选择模型！"); return; }
+    const data = {
+        input_type: inputType, path_input: pathInput, model_name: modelInput,
+        conf_thres: document.getElementById('confThres').value,
+        iou_thres: document.getElementById('iouThres').value,
+        imgsz: document.getElementById('imgSz').value,
+        save_txt: document.getElementById('saveTxt').checked,
+        save_conf: document.getElementById('saveConf').checked,
+        save_crop: document.getElementById('saveCrop').checked,
+    };
+    fetch('/api/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) })
+    .then(res => res.json())
+    .then(res => {
+        if(res.status === "started") {
+            const img = document.getElementById('videoStream');
+            const ph = document.getElementById('placeholder');
+            isPaused = false;
+            const btnPause = document.getElementById('btnPause');
+            btnPause.innerText = "⏸️ 暂停 (Pause)";
+            btnPause.style.backgroundColor = "#fd7e14";
+            img.src = "/video_feed?" + new Date().getTime();
+            img.style.display = "block";
+            ph.style.display = "none";
+            startPollingResults(false);
+        }
+    }).catch(err => alert("启动失败: " + err));
+}
+
+function pauseSystem() {
+    fetch('/api/pause', {method: 'POST'}).then(res => res.json()).then(data => {
+        const btn = document.getElementById('btnPause');
+        if (data.is_paused) { btn.innerText = "▶️ 继续 (Resume)"; btn.style.backgroundColor = "#17a2b8"; }
+        else { btn.innerText = "⏸️ 暂停 (Pause)"; btn.style.backgroundColor = "#fd7e14"; }
+    });
+}
+
+function stopSystem() {
+    fetch('/api/stop', {method: 'POST'}).then(() => {
+        const img = document.getElementById('videoStream');
+        const ph = document.getElementById('placeholder');
+        img.style.display = "none"; img.src = ""; ph.style.display = "flex";
+
+        // 【修改点】确保文字是白色（样式已改，这里只改结构）
+        ph.innerHTML = "<div style='font-size:3rem'>🛑</div><p>检测已停止</p>";
+
+        stopPollingResults();
+        let attempt = 0;
+        const finalCheckInterval = setInterval(() => { fetchResults(); attempt++; if (attempt >= 6) clearInterval(finalCheckInterval); }, 500);
+    });
+}
+
+function startPollingResults(clearTable = false) {
+    if (pollingInterval) clearInterval(pollingInterval);
+    if (clearTable) document.querySelector('#resultTable tbody').innerHTML = "";
+    pollingInterval = setInterval(() => { fetchResults(); }, 1000);
+}
+function stopPollingResults() { if (pollingInterval) clearInterval(pollingInterval); }
+
+function fetchResults() {
+    fetch('/api/results').then(res => res.json()).then(paths => {
+        const tbody = document.querySelector('#resultTable tbody');
+        const currentRows = tbody.children.length;
+        if (paths.length > currentRows) {
+            for (let i = currentRows; i < paths.length; i++) {
+                const tr = document.createElement('tr');
+                const tdIndex = document.createElement('td'); tdIndex.innerText = i + 1;
+                const tdPath = document.createElement('td'); tdPath.innerText = paths[i];
+                tr.appendChild(tdIndex); tr.appendChild(tdPath);
+                tbody.appendChild(tr);
+            }
+            const wrapper = document.querySelector('.table-wrapper');
+            wrapper.scrollTop = wrapper.scrollHeight;
+        }
+    });
+}
+
+// --- AI Chat ---
+function toggleChat() {
+    const win = document.getElementById('chatWindow');
+    if (win.style.display === 'flex') {
+        win.style.display = 'none';
+    } else {
+        document.getElementById('chartWindow').style.display = 'none';
+        win.style.display = 'flex';
+        setTimeout(() => document.getElementById('chatInput').focus(), 100);
+    }
+}
+function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    appendMessage('user', msg);
+    input.value = '';
+    const botMsgDiv = appendMessage('bot', '✨ AI 正在思考中...');
+    botMsgDiv.classList.add('loading-rainbow');
+    let fullMarkdownText = "";
+    let isFirstChunk = true;
+    try {
+        const response = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: msg}) });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (isFirstChunk) { botMsgDiv.classList.remove('loading-rainbow'); botMsgDiv.innerHTML = ""; isFirstChunk = false; }
+            const chunk = decoder.decode(value, {stream: true});
+            fullMarkdownText += chunk;
+            botMsgDiv.innerHTML = marked.parse(fullMarkdownText);
+            const body = document.getElementById('chatBody');
+            body.scrollTop = body.scrollHeight;
+        }
+    } catch (err) {
+        botMsgDiv.classList.remove('loading-rainbow');
+        botMsgDiv.innerHTML += `<br><span style="color:red">[❌ 网络/API 错误: ${err}]</span>`;
+    }
+}
+function appendMessage(role, text) {
+    const body = document.getElementById('chatBody');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${role}`;
+    div.innerText = text;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+    return div;
+}
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\out\production\my_yolo_web\static\style.css ==========
+
+/* static/style.css */
+:root { --bg-color: #f8f9fa; --card-bg: #ffffff; --primary: #007bff; --success: #28a745; --warning: #fd7e14; --danger: #dc3545; --border: #dee2e6; --text-dark: #343a40; }
+body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: var(--bg-color); color: var(--text-dark); margin: 0; padding: 20px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; }
+
+/* 彩虹动态 Header */
+@keyframes rainbow-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+.rainbow-header {
+    background: linear-gradient(90deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb);
+    background-size: 400% 400%;
+    animation: rainbow-flow 10s ease infinite;
+    color: #333;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    text-align: center;
+    margin-bottom: 20px;
+}
+.header h1 { margin: 0; font-family: "FangSong", serif; font-weight: bold; font-size: 2.2rem; letter-spacing: 2px;}
+
+/* 布局 */
+.main-layout { display: flex; gap: 20px; flex: 1; height: 0; min-height: 500px; }
+.sidebar { flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.05); max-width: 350px; overflow-y: auto; }
+.display-area { flex: 2; background: #000; border-radius: 8px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; border: 4px solid #333; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+#videoStream { max-width: 100%; max-height: 100%; display: none; }
+
+/* 【修改点4 & 5】占位符（等待运行/停止）文字设为白色 */
+.placeholder { color: #fff; text-align: center; font-weight: bold; }
+
+.results-panel { flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.table-wrapper { flex: 1; overflow-y: auto; margin-top: 5px; border: 1px solid #eee; border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: 1px solid #f0f0f0; padding: 10px 8px; text-align: left; font-size: 13px; }
+th { background-color: #f8f9fa; color: #495057; position: sticky; top: 0; z-index: 1; font-weight: 600; border-bottom: 2px solid #dee2e6; }
+
+/* 控件 */
+.control-group { margin-bottom: 15px; }
+.section-title { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 0; }
+label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px; }
+input[type="text"], input[type="number"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; background-color: #fff; font-family: inherit; }
+.radio-group { display: flex; gap: 15px; margin-bottom: 10px; }
+.checkbox-item { margin-bottom: 5px; cursor: pointer; font-size: 14px;}
+.btn-group { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 15px; border-top: 1px solid #eee;}
+.btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: all 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+.btn-run { background-color: var(--success); }
+.btn-pause { background-color: var(--warning); }
+.btn-stop { background-color: var(--danger); }
+.btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-clear { background-color: #fff; border: 1px solid #dc3545; color: #dc3545; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+.btn-clear:hover { background-color: #dc3545; color: white; }
+
+/* 悬浮组件 */
+.float-widget-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; align-items: flex-end; gap: 15px; }
+.float-btn { display: flex; align-items: center; color: white; border: none; border-radius: 50px; height: 50px; width: 50px; padding: 0; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); overflow: hidden; transition: width 0.3s ease, transform 0.2s; }
+.float-btn .icon { width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; font-size: 24px; flex-shrink: 0; }
+.float-btn .text { white-space: nowrap; opacity: 0; font-weight: bold; font-size: 16px; padding-right: 20px; transition: opacity 0.2s ease; }
+.float-btn:hover { width: 140px; transform: translateY(-2px); }
+.float-btn:hover .text { opacity: 1; }
+.ai-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.chart-btn { background: linear-gradient(135deg, #20bf55 0%, #01baef 100%); }
+
+/* --- 悬浮窗口通用配置 --- */
+.float-window {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    right: 0;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 5px 30px rgba(0,0,0,0.25);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+
+    /* 核心适配：最大宽度不超过屏幕减去边距，确保不被切掉 */
+    max-width: calc(100vw - 60px);
+    max-height: calc(100vh - 150px);
+
+    /* 默认基础宽度 (两个窗口共用) */
+    width: 400px;
+}
+
+/* AI 窗口特定高度 */
+.chat-window { height: 550px; }
+
+/* 【修改点1】图表窗口 */
+/* 删除了任何关于 width 的设置，让它完全继承 .float-window 的 width: 400px */
+/* 这样它就会同样受到 max-width 的约束 */
+.chart-window {
+    height: 400px;
+    bottom: 140px;
+}
+
+.window-header { color: white; padding: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.ai-header-bg { background: #667eea; }
+.chart-header-bg { background: #01baef; }
+.close-btn { cursor: pointer; font-size: 18px; opacity: 0.8; transition: opacity 0.2s; }
+.close-btn:hover { opacity: 1; }
+.window-body { flex: 1; padding: 15px; overflow-y: auto; background-color: #f9f9f9; }
+
+/* 聊天内容 */
+.chat-body { flex: 1; padding: 15px; overflow-y: auto; background-color: #f9f9f9; display: flex; flex-direction: column; gap: 15px; }
+.chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.6; word-wrap: break-word; height: auto; overflow: visible; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.chat-msg.bot { background-color: white; border: 1px solid #e5e7eb; align-self: flex-start; border-bottom-left-radius: 2px; }
+.chat-msg.user { background-color: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+.chat-footer { padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px; background: white; flex-shrink: 0; }
+.chat-footer input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+.chat-footer button { background: #667eea; color: white; border: none; padding: 0 20px; border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+.chat-footer button:hover { background: #5a67d8; }
+
+/* 动画 */
+@keyframes rainbow-move { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.loading-rainbow { background: linear-gradient(270deg, #ff9a9e, #fad0c4, #ffd1ff, #a18cd1, #fbc2eb); background-size: 400% 400%; animation: rainbow-move 3s ease infinite; color: #4a4a4a; border: none !important; font-weight: bold; }
+
+/* Markdown */
+.chat-msg.bot h1, .chat-msg.bot h2, .chat-msg.bot h3 { margin-top: 10px; margin-bottom: 5px; font-size: 1.1em; border-bottom: 1px solid #eee; }
+.chat-msg.bot ul, .chat-msg.bot ol { padding-left: 20px; margin: 5px 0; }
+.chat-msg.bot table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 12px; display: block; overflow-x: auto; }
+.chat-msg.bot th, .chat-msg.bot td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+.chat-msg.bot th { background-color: #f2f2f2; font-weight: bold; }
+.chat-msg.bot pre { background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; overflow-x: auto; margin: 10px 0; }
+.chat-msg.bot code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-family: Consolas, monospace; }
+.chat-msg.bot pre code { background: none; color: inherit; }
+
+/* 媒体查询 */
+@media (max-width: 768px) {
+    body { padding: 10px; }
+    .main-layout { flex-direction: column; height: auto; }
+    .sidebar, .display-area, .results-panel { max-width: 100%; width: 100%; }
+    .display-area { height: 300px; }
+    .results-panel { height: 300px; }
+    .float-window { width: 90%; right: 5%; bottom: 90px; height: 60vh; }
+    .chart-window { bottom: 160px; }
+}
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\out\production\my_yolo_web\templates\index.html ==========
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv11 智能检测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+
+    <div class="header rainbow-header">
+        <h1>🚀 基于 YOLOv11 目标检测系统 (Web版)</h1>
+    </div>
+
+    <div class="main-layout">
+        <div class="sidebar">
+            <h3 class="section-title">⚙️ 输入源与参数</h3>
+
+            <div class="control-group">
+                <label>📡 输入类型</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="inputType" value="path" checked onchange="toggleInput(this.value)">
+                        📂 文件/文件夹
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="inputType" value="camera" onchange="toggleInput(this.value)">
+                        📷 摄像头
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group" id="pathInputGroup">
+                <label>📍 本地路径 (点选 example 或 手动输入)</label>
+                <input type="text" id="pathInput" list="pathOptions" placeholder="📂 点击选择或粘贴路径..." onfocus="this.value=''">
+                <datalist id="pathOptions"></datalist>
+            </div>
+
+            <div class="control-group">
+                <label>🧠 模型选择 (点选 models 或 手动输入)</label>
+                <input type="text" id="modelInput" list="modelOptions" placeholder="🤖 点击这里选择模型..." onfocus="this.value=''">
+                <datalist id="modelOptions"></datalist>
+            </div>
+
+            <div class="control-group">
+                <label>🎯 置信度 (Conf)</label>
+                <input type="number" id="confThres" step="0.01" min="0" max="1" value="0.25">
+            </div>
+
+            <div class="control-group">
+                <label>🧩 IOU 阈值</label>
+                <input type="number" id="iouThres" step="0.01" min="0" max="1" value="0.45">
+            </div>
+
+            <div class="control-group">
+                <label>📏 图像尺寸 (Size)</label>
+                <input type="number" id="imgSz" value="640">
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 5px;">💾 保存选项</label>
+                <div class="checkbox-item"><input type="checkbox" id="saveTxt"> 📝 保存 TXT</div>
+                <div class="checkbox-item"><input type="checkbox" id="saveConf"> 📊 保存置信度</div>
+                <div class="checkbox-item"><input type="checkbox" id="saveCrop"> 🖼️ 保存截图 (Crop)</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-run" onclick="startSystem()">▶️ 运行代码 (Run)</button>
+                <button id="btnPause" class="btn btn-pause" onclick="pauseSystem()">⏸️ 暂停 (Pause)</button>
+                <button class="btn btn-stop" onclick="stopSystem()">⏹️ 终止推理 (Stop)</button>
+            </div>
+        </div>
+
+        <div class="display-area">
+            <div class="placeholder" id="placeholder">
+                <div style="font-size: 3rem;">📺</div>
+                <p>等待运行...</p>
+            </div>
+            <img id="videoStream" src="">
+        </div>
+
+        <div class="results-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+                <h3 style="margin:0; font-size:16px;">📋 检测结果列表</h3>
+                <button class="btn-clear" onclick="clearResults()">🗑️ 清空列表</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="resultTable">
+                    <thead><tr><th style="width: 60px;">#️⃣ 序号</th><th>📂 结果保存路径</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="float-widget-container">
+
+        <div class="float-window chart-window" id="chartWindow">
+            <div class="window-header chart-header-bg">
+                <span>📊 实时检测统计</span>
+                <span class="close-btn" onclick="toggleChart()">✖</span>
+            </div>
+            <div class="window-body">
+                <div id="mainChart" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+
+        <div class="float-window chat-window" id="chatWindow">
+            <div class="window-header ai-header-bg">
+                <span>🤖 智能助手</span>
+                <span class="close-btn" onclick="toggleChat()">✖</span>
+            </div>
+            <div class="chat-body" id="chatBody">
+                <div class="chat-msg bot">你好！我是你的 AI 助手，有什么可以帮你的吗？</div>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chatInput" placeholder="输入问题..." onkeypress="handleEnter(event)">
+                <button onclick="sendMessage()">🚀 发送</button>
+            </div>
+        </div>
+
+        <div class="float-btn-group">
+            <button class="float-btn chart-btn" onclick="toggleChart()" title="查看实时统计">
+                <span class="icon">📊</span>
+                <span class="text">实时统计</span>
+            </button>
+            <button class="float-btn ai-btn" onclick="toggleChat()" title="点击召唤 AI 助手">
+                <span class="icon">🤖</span>
+                <span class="text">AI 助手</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\out\production\my_yolo_web\ai_api.py ==========
+
+# ai_api.py
+import requests
+import json
+
+API_KEY = "c0a5e654-d53a-4480-87f8-a7956b27601d"
+MODEL_ID = "doubao-seed-1-6-251015"
+API_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+
+
+class DoubaoClient:
+    def __init__(self):
+        self.api_key = API_KEY
+        self.model_id = MODEL_ID
+        self.api_url = API_URL
+        self.history = [
+            {
+                "role": "system",
+                "content": "你是一个乐于助人的AI助手，请准确、友好地回答用户的任何问题。"
+            }
+        ]
+
+    # 改名为 get_response_stream 以示区别
+    def get_response_stream(self, user_input):
+        self.history.append({"role": "user", "content": user_input})
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-Volc-Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
+        # 【修改1】开启流式
+        payload = {
+            "model": self.model_id,
+            "messages": self.history,
+            "stream": True,
+            "max_tokens": 2048
+        }
+
+        full_content = ""  # 用于记录完整回复，存入历史
+
+        try:
+            # 【修改2】stream=True，保留 proxies=None 解决代理问题
+            resp = requests.post(
+                self.api_url,
+                headers=headers,
+                json=payload,
+                timeout=None,
+                proxies={"http": None, "https": None},
+                stream=True
+            )
+
+            if resp.status_code != 200:
+                yield f"Error: {resp.status_code} - {resp.text}"
+                return
+
+            # 【修改3】按行读取流数据
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+
+                # 数据格式通常是: data: {...json...}
+                decoded_line = line.decode('utf-8').strip()
+
+                if decoded_line.startswith("data:"):
+                    json_str = decoded_line[5:].strip()  # 去掉 "data:"
+
+                    if json_str == "[DONE]":  # 结束标志
+                        break
+
+                    try:
+                        data = json.loads(json_str)
+                        if "choices" in data:
+                            # 提取增量内容 (delta)
+                            delta = data["choices"][0].get("delta", {}).get("content", "")
+                            if delta:
+                                full_content += delta
+                                yield delta  # 【核心】把这几个字立刻吐给前端
+                    except json.JSONDecodeError:
+                        continue
+
+            # 对话结束后，把完整的回答存入历史
+            self.history.append({"role": "assistant", "content": full_content})
+
+        except Exception as e:
+            yield f"Network Error: {str(e)}"
+
+    def clear_history(self):
+        self.history = [
+            {
+                "role": "system",
+                "content": "你是一个乐于助人的AI助手，请准确、友好地回答用户的任何问题。"
+            }
+        ]
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\out\production\my_yolo_web\app.py ==========
+
+# app.py
+import os
+import sys
+from flask import Flask, render_template, Response, request, jsonify, stream_with_context
+from web_inference import WebDetector
+from ai_api import DoubaoClient
+
+app = Flask(__name__)
+detector = WebDetector()
+ai_client = DoubaoClient()
+
+# --- 路径配置 ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
+EXAMPLES_DIR = os.path.join(BASE_DIR, 'example')
+
+# --- 启动自检 ---
+print("-" * 50)
+print(f"【系统自检】正在检查文件夹路径...")
+print(f"1. 项目根目录: {BASE_DIR}")
+print(f"2. 模型文件夹: {MODELS_DIR}")
+
+if not os.path.exists(MODELS_DIR):
+    print(f"   [❌ 错误] models 文件夹不存在！请在 app.py 同级目录下创建 models 文件夹。")
+    os.makedirs(MODELS_DIR)
+else:
+    files = [f for f in os.listdir(MODELS_DIR) if f.endswith('.pt')]
+    print(f"   [✅ 正常] 发现 {len(files)} 个模型文件: {files}")
+
+print(f"3. 示例文件夹: {EXAMPLES_DIR}")
+if not os.path.exists(EXAMPLES_DIR):
+    os.makedirs(EXAMPLES_DIR)
+print("-" * 50)
+
+
+# --- 路由定义 ---
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(detector.gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route('/api/models')
+def list_models():
+    try:
+        if not os.path.exists(MODELS_DIR):
+            return jsonify([])
+        files = [f for f in os.listdir(MODELS_DIR)
+                 if (f.lower().endswith('.pt') or f.lower().endswith('.pth'))]
+        return jsonify(files)
+    except Exception as e:
+        print(f"Error reading models: {e}")
+        return jsonify([])
+
+
+@app.route('/api/examples')
+def list_examples():
+    try:
+        if not os.path.exists(EXAMPLES_DIR):
+            return jsonify([])
+        files = [f for f in os.listdir(EXAMPLES_DIR) if os.path.isfile(os.path.join(EXAMPLES_DIR, f))]
+        paths = [os.path.join('example', f).replace('\\', '/') for f in files]
+        return jsonify(paths)
+    except Exception:
+        return jsonify([])
+
+
+@app.route('/api/start', methods=['POST'])
+def start_detection():
+    data = request.json
+
+    model_input = data.get('model_name', '').strip()
+    if os.path.sep in model_input or '/' in model_input:
+        full_model_path = model_input
+    else:
+        full_model_path = os.path.join(MODELS_DIR, model_input)
+
+    input_type = data.get('input_type')
+    source = 'camera' if input_type == 'camera' else data.get('path_input', '').strip()
+
+    params = {
+        "model_path": full_model_path,
+        "source": source,
+        "conf_thres": float(data.get('conf_thres', 0.25)),
+        "iou_thres": float(data.get('iou_thres', 0.45)),
+        "imgsz": int(data.get('imgsz', 640)),
+        "save_txt": data.get('save_txt', False),
+        "save_conf": data.get('save_conf', False),
+        "save_crop": data.get('save_crop', False)
+    }
+
+    detector.update_params(params)
+    return jsonify({"status": "started"})
+
+
+@app.route('/api/pause', methods=['POST'])
+def pause_detection():
+    is_paused = detector.toggle_pause()
+    return jsonify({"status": "paused" if is_paused else "resumed", "is_paused": is_paused})
+
+
+@app.route('/api/stop', methods=['POST'])
+def stop_detection():
+    detector.stop_event = True
+    return jsonify({"status": "stopped"})
+
+
+@app.route('/api/results')
+def get_results():
+    with detector.results_lock:
+        return jsonify(detector.recent_results)
+
+
+@app.route('/api/clear_results', methods=['POST'])
+def clear_results():
+    detector.clear_results()
+    return jsonify({"status": "cleared"})
+
+
+# --- 新增：获取实时统计数据 API ---
+@app.route('/api/stats')
+def get_stats():
+    with detector.stats_lock:
+        return jsonify(detector.current_stats)
+
+
+@app.route('/api/chat', methods=['POST'])
+def chat_with_ai():
+    data = request.json
+    user_msg = data.get('message', '')
+    if not user_msg:
+        return "请输入内容", 400
+
+    def generate():
+        for chunk in ai_client.get_response_stream(user_msg):
+            yield chunk
+
+    return Response(stream_with_context(generate()), mimetype='text/plain')
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\out\production\my_yolo_web\web_inference.py ==========
+
+# web_inference.py
+import cv2
+import time
+import threading
+from pathlib import Path
+from ultralytics import YOLO
+from collections import Counter
+from yolo_io_utils import (
+    create_exp_dir, ensure_labels_dir, ensure_crops_dir,
+    split_media, build_videowriter, save_annotated_image, save_txt, save_crops,
+    IMAGE_EXTS, VIDEO_EXTS
+)
+
+
+class WebDetector:
+    def __init__(self):
+        self.model = None
+        self.model_path = None
+        self.is_running = False
+        self.is_paused = False
+        self.stop_event = False
+
+        # 结果列表
+        self.recent_results = []
+        self.results_lock = threading.Lock()
+
+        # --- 新增：实时统计数据 ---
+        self.current_stats = {}
+        self.stats_lock = threading.Lock()
+
+        # 默认参数
+        self.params = {
+            "source": "",
+            "model_path": "yolo11n.pt",
+            "conf_thres": 0.25,
+            "iou_thres": 0.45,
+            "imgsz": 640,
+            "save_txt": False,
+            "save_conf": False,
+            "save_crop": False
+        }
+
+    def clear_results(self):
+        with self.results_lock:
+            self.recent_results = []
+            print("[Info] 后端结果列表已清空")
+
+    def update_params(self, new_params):
+        if "model_path" in new_params and new_params["model_path"] != self.model_path:
+            try:
+                self.model = YOLO(new_params["model_path"])
+                self.model_path = new_params["model_path"]
+                print(f"模型已加载: {self.model_path}")
+            except Exception as e:
+                print(f"模型加载失败: {e}")
+
+        self.params.update(new_params)
+
+    def _infer_single_frame(self, frame, stem, exp_dir, labels_dir, crops_root):
+        results = self.model.predict(
+            frame,
+            conf=float(self.params["conf_thres"]),
+            iou=float(self.params["iou_thres"]),
+            imgsz=int(self.params["imgsz"]),
+            agnostic_nms=True,
+            verbose=False
+        )[0]
+        im0 = results.plot()
+
+        boxes = results.boxes.xyxy.tolist()
+        confs = results.boxes.conf.tolist()
+        clss = results.boxes.cls.tolist()
+        names = results.names
+
+        # --- 统计当前帧类别 ---
+        detected_names = [names[int(cls)] for cls in clss]
+        stats_counter = Counter(detected_names)
+        with self.stats_lock:
+            self.current_stats = dict(stats_counter)
+
+        if self.params["save_txt"] and labels_dir:
+            txt_path = labels_dir / f"{stem}.txt"
+            save_txt(txt_path, boxes, clss, confs, self.params["save_conf"])
+
+        if self.params["save_crop"] and crops_root:
+            save_crops(crops_root, stem, results.orig_img, boxes, clss, names)
+
+        return im0
+
+    def toggle_pause(self):
+        self.is_paused = not self.is_paused
+        return self.is_paused
+
+    def gen_frames(self):
+        self.is_running = True
+        self.stop_event = False
+        self.is_paused = False
+
+        # 清空统计
+        with self.stats_lock:
+            self.current_stats = {}
+
+        source = self.params["source"]
+        exp_dir = create_exp_dir('runs', 'web_exp')
+        labels_dir = ensure_labels_dir(exp_dir) if self.params["save_txt"] else None
+        crops_root = ensure_crops_dir(exp_dir) if self.params["save_crop"] else None
+
+        # --- 摄像头模式 ---
+        if source == "camera":
+            cap = cv2.VideoCapture(0)
+            vid_writer = None
+            out_path = exp_dir / f"camera_{int(time.time())}.mp4"
+
+            try:
+                while self.is_running and cap.isOpened() and not self.stop_event:
+                    if self.is_paused:
+                        time.sleep(0.1)
+                        continue
+
+                    success, frame = cap.read()
+                    if not success: break
+
+                    im0 = self._infer_single_frame(frame, f"cam_{time.time()}", exp_dir, labels_dir, crops_root)
+
+                    if vid_writer is None:
+                        h, w = im0.shape[:2]
+                        vid_writer = build_videowriter(out_path, 25, (w, h))
+                    vid_writer.write(im0)
+
+                    ret, buffer = cv2.imencode('.jpg', im0)
+                    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+            finally:
+                cap.release()
+                if vid_writer:
+                    vid_writer.release()
+                    with self.results_lock:
+                        self.recent_results.append(str(out_path))
+
+        # --- 文件/文件夹模式 ---
+        else:
+            path_obj = Path(source)
+            files_to_process = []
+
+            if path_obj.is_dir():
+                imgs, vids = split_media(path_obj)
+                files_to_process = imgs + vids
+            elif path_obj.is_file():
+                files_to_process = [path_obj]
+
+            if not files_to_process:
+                err_img = self._make_err_img()
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cv2.imencode('.jpg', err_img)[
+                    1].tobytes() + b'\r\n')
+                self.is_running = False
+                return
+
+            for file_path in files_to_process:
+                if not self.is_running or self.stop_event: break
+
+                if file_path.suffix.lower() in VIDEO_EXTS:
+                    cap = cv2.VideoCapture(str(file_path))
+                    out_name = exp_dir / f"{file_path.stem}_out.mp4"
+                    vid_writer = None
+
+                    try:
+                        while cap.isOpened() and self.is_running and not self.stop_event:
+                            if self.is_paused:
+                                time.sleep(0.1)
+                                continue
+
+                            success, frame = cap.read()
+                            if not success: break
+
+                            im0 = self._infer_single_frame(frame, f"{file_path.stem}_{int(time.time())}", exp_dir,
+                                                           labels_dir, crops_root)
+
+                            if vid_writer is None:
+                                h, w = im0.shape[:2]
+                                vid_writer = build_videowriter(out_name, 30, (w, h))
+                            vid_writer.write(im0)
+
+                            ret, buffer = cv2.imencode('.jpg', im0)
+                            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+                    finally:
+                        cap.release()
+                        if vid_writer:
+                            vid_writer.release()
+                            with self.results_lock:
+                                self.recent_results.append(str(out_name))
+                else:
+                    # 图片模式
+                    while self.is_paused and self.is_running and not self.stop_event:
+                        time.sleep(0.1)
+
+                    frame = cv2.imread(str(file_path))
+                    if frame is None: continue
+
+                    im0 = self._infer_single_frame(frame, file_path.stem, exp_dir, labels_dir, crops_root)
+                    save_path = exp_dir / f"{file_path.stem}_res.jpg"
+                    save_annotated_image(im0, save_path)
+
+                    with self.results_lock:
+                        self.recent_results.append(str(save_path))
+
+                    for _ in range(10):
+                        if not self.is_running or self.stop_event: break
+                        ret, buffer = cv2.imencode('.jpg', im0)
+                        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                        time.sleep(0.1)
+
+        self.is_running = False
+
+    def _make_err_img(self):
+        import numpy as np
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(img, "No Files Found", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        return img
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\out\production\my_yolo_web\yolo_io_utils.py ==========
+
+# yolo_io_utils.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List, Tuple, Sequence, Dict, Optional
+import re
+import cv2
+import os
+
+IMAGE_EXTS = {
+    ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".webp",
+    ".heif", ".raw", ".ico", ".jfif"
+}
+
+VIDEO_EXTS = {
+    ".mp4", ".avi", ".mov", ".mkv", ".flv", ".webm", ".wmv",
+    ".mpeg", ".mpg", ".3gp", ".ts"
+}
+
+
+def contains_chinese(s: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff]", s))
+
+
+def ensure_dir(p: Path | str) -> Path:
+    p = Path(p)
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def create_exp_dir(base: Path | str = "runs", prefix: str = "exp") -> Path:
+    base = ensure_dir(base)
+    exp = base / prefix
+    if not exp.exists():
+        exp.mkdir()
+        return exp
+    i = 1
+    while True:
+        cand = base / f"{prefix}{i}"
+        if not cand.exists():
+            cand.mkdir()
+            return cand
+        i += 1
+
+
+def ensure_labels_dir(exp_dir: Path | str) -> Path:
+    return ensure_dir(Path(exp_dir) / "labels")
+
+
+def ensure_crops_dir(exp_dir: Path | str) -> Path:
+    return ensure_dir(Path(exp_dir) / "crops")
+
+
+def split_media(dir_path: Path | str) -> Tuple[List[Path], List[Path]]:
+    dir_path = Path(dir_path)
+    images, videos = [], []
+    if not dir_path.exists():
+        return [], []
+    for f in dir_path.iterdir():
+        if not f.is_file():
+            continue
+        ext = f.suffix.lower()
+        if ext in IMAGE_EXTS:
+            images.append(f)
+        elif ext in VIDEO_EXTS:
+            videos.append(f)
+    return images, videos
+
+
+def build_videowriter(output_path: Path | str, fps: float, size: tuple[int, int],
+                      fourcc: str = "mp4v") -> cv2.VideoWriter:
+    output_path = str(output_path)
+    fourcc_val = cv2.VideoWriter_fourcc(*fourcc)
+    return cv2.VideoWriter(output_path, fourcc_val, fps, size)
+
+
+def save_annotated_image(im_bgr, save_path: Path | str) -> None:
+    cv2.imwrite(str(save_path), im_bgr)
+
+
+def save_txt(txt_path: Path | str, boxes, classes, confs=None, save_conf=False) -> None:
+    txt_path = Path(txt_path)
+    ensure_dir(txt_path.parent)
+    with txt_path.open("w", encoding="utf-8") as f:
+        if save_conf and confs is not None:
+            for loc, cls, conf in zip(boxes, classes, confs):
+                x1, y1, x2, y2 = map(int, map(round, loc))
+                f.write(f"{int(cls)} {x1} {y1} {x2} {y2} {float(conf):.4f}\n")
+        else:
+            for loc, cls in zip(boxes, classes):
+                x1, y1, x2, y2 = map(int, map(round, loc))
+                f.write(f"{int(cls)} {x1} {y1} {x2} {y2}\n")
+
+
+def save_crops(crops_root: Path | str, base_stem: str, frame_bgr, boxes, classes, names_map) -> None:
+    crops_root = ensure_dir(crops_root)
+    H, W = frame_bgr.shape[:2]
+    for i, (loc, cls) in enumerate(zip(boxes, classes)):
+        cls_idx = int(cls)
+        if names_map is None:
+            class_name = str(cls_idx)
+        elif isinstance(names_map, dict):
+            class_name = names_map.get(cls_idx, str(cls_idx))
+        else:
+            class_name = (names_map[cls_idx] if 0 <= cls_idx < len(names_map) else str(cls_idx))
+
+        class_dir = ensure_dir(Path(crops_root) / class_name)
+        x1, y1, x2, y2 = map(int, map(round, loc))
+        x1, x2 = max(0, min(x1, W)), max(0, min(x2, W))
+        y1, y2 = max(0, min(y1, H)), max(0, min(y2, H))
+        if x2 <= x1 or y2 <= y1: continue
+        crop = frame_bgr[y1:y2, x1:x2]
+        out_path = class_dir / f"{base_stem}_{class_name}_{i}.jpg"
+        cv2.imwrite(str(out_path), crop)
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\static\script.js ==========
+
+// static/script.js
+
+let pollingInterval = null;
+let isPaused = false;
+let myChart = null;
+let chartInterval = null;
+
+document.addEventListener('DOMContentLoaded', function() {
+    loadModels();
+    loadExamples();
+    initChart();
+});
+
+// --- 【核心修改】ECharts 初始化与自适应 ---
+function initChart() {
+    const chartDom = document.getElementById('mainChart');
+    const chartContainer = document.getElementById('chartWindow'); // 获取外部容器
+
+    if(!chartDom) return;
+
+    myChart = echarts.init(chartDom);
+
+    const colors = [
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#83bff6'}, {offset: 0.5, color: '#188df0'}, {offset: 1, color: '#188df0'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#20bf55'}, {offset: 1, color: '#01baef'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#fbc2eb'}, {offset: 1, color: '#a6c1ee'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#ff9a9e'}, {offset: 1, color: '#fecfef'}]),
+        new echarts.graphic.LinearGradient(0, 0, 0, 1, [{offset: 0, color: '#a18cd1'}, {offset: 1, color: '#fbc2eb'}])
+    ];
+
+    const option = {
+        title: { text: '实时类别统计', left: 'center' },
+        tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+        grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+        xAxis: { type: 'category', data: [] },
+        yAxis: { type: 'value', minInterval: 1 },
+        series: [{
+            name: '数量', type: 'bar', data: [],
+            itemStyle: {
+                color: function(params) {
+                    return colors[params.dataIndex % colors.length];
+                },
+                borderRadius: [5, 5, 0, 0]
+            },
+            label: { show: true, position: 'top' }
+        }]
+    };
+    myChart.setOption(option);
+
+    // 【终极适配方案】使用 ResizeObserver 监听容器大小变化
+    // 只要 chartWindow 的 div 大小变了（不管是因为浏览器缩放，还是 CSS 媒体查询），图表都会自动重绘
+    const resizeObserver = new ResizeObserver(() => {
+        myChart.resize();
+    });
+
+    if (chartContainer) {
+        resizeObserver.observe(chartContainer);
+    }
+}
+
+function toggleChart() {
+    const win = document.getElementById('chartWindow');
+    if (win.style.display === 'flex') {
+        win.style.display = 'none';
+        if (chartInterval) clearInterval(chartInterval);
+    } else {
+        document.getElementById('chatWindow').style.display = 'none';
+        win.style.display = 'flex';
+        // 打开瞬间强制重绘一次，防止渲染错位
+        setTimeout(() => myChart.resize(), 50);
+        startChartPolling();
+    }
+}
+
+function startChartPolling() {
+    if (chartInterval) clearInterval(chartInterval);
+    updateChartData();
+    chartInterval = setInterval(updateChartData, 500);
+}
+
+function updateChartData() {
+    fetch('/api/stats')
+    .then(res => res.json())
+    .then(data => {
+        const categories = Object.keys(data);
+        const counts = Object.values(data);
+        myChart.setOption({ xAxis: { data: categories }, series: [{ data: counts }] });
+    })
+    .catch(err => console.error(err));
+}
+
+// --- 常规逻辑 ---
+function loadModels() {
+    fetch('/api/models').then(res => res.json()).then(files => {
+        const dataList = document.getElementById('modelOptions');
+        const inputPath = document.getElementById('modelInput');
+        if(dataList) {
+            dataList.innerHTML = "";
+            files.forEach(f => {
+                const opt = document.createElement('option');
+                opt.value = f;
+                dataList.appendChild(opt);
+            });
+            if (files.length > 0 && inputPath && !inputPath.value) inputPath.value = files[0];
+        }
+    }).catch(err => console.error(err));
+}
+
+function loadExamples() {
+    fetch('/api/examples').then(res => res.json()).then(paths => {
+        const dataList = document.getElementById('pathOptions');
+        if(dataList) {
+            dataList.innerHTML = "";
+            paths.forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p;
+                dataList.appendChild(opt);
+            });
+        }
+    });
+}
+
+function toggleInput(type) {
+    document.getElementById('pathInputGroup').style.display = (type === 'path') ? 'block' : 'none';
+}
+
+function clearResults() {
+    if(!confirm("确定要清空所有检测结果吗？")) return;
+    fetch('/api/clear_results', {method: 'POST'})
+    .then(res => res.json())
+    .then(data => { document.querySelector('#resultTable tbody').innerHTML = ""; });
+}
+
+function startSystem() {
+    const inputType = document.querySelector('input[name="inputType"]:checked').value;
+    const pathInput = document.getElementById('pathInput').value;
+    const modelInput = document.getElementById('modelInput').value;
+    if (inputType === 'path' && !pathInput) { alert("❌ 请输入或选择路径！"); return; }
+    if (!modelInput) { alert("❌ 请输入或选择模型！"); return; }
+    const data = {
+        input_type: inputType, path_input: pathInput, model_name: modelInput,
+        conf_thres: document.getElementById('confThres').value,
+        iou_thres: document.getElementById('iouThres').value,
+        imgsz: document.getElementById('imgSz').value,
+        save_txt: document.getElementById('saveTxt').checked,
+        save_conf: document.getElementById('saveConf').checked,
+        save_crop: document.getElementById('saveCrop').checked,
+    };
+    fetch('/api/start', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) })
+    .then(res => res.json())
+    .then(res => {
+        if(res.status === "started") {
+            const img = document.getElementById('videoStream');
+            const ph = document.getElementById('placeholder');
+            isPaused = false;
+            const btnPause = document.getElementById('btnPause');
+            btnPause.innerText = "⏸️ 暂停 (Pause)";
+            btnPause.style.backgroundColor = "#fd7e14";
+            img.src = "/video_feed?" + new Date().getTime();
+            img.style.display = "block";
+            ph.style.display = "none";
+            startPollingResults(false);
+        }
+    }).catch(err => alert("启动失败: " + err));
+}
+
+function pauseSystem() {
+    fetch('/api/pause', {method: 'POST'}).then(res => res.json()).then(data => {
+        const btn = document.getElementById('btnPause');
+        if (data.is_paused) { btn.innerText = "▶️ 继续 (Resume)"; btn.style.backgroundColor = "#17a2b8"; }
+        else { btn.innerText = "⏸️ 暂停 (Pause)"; btn.style.backgroundColor = "#fd7e14"; }
+    });
+}
+
+function stopSystem() {
+    fetch('/api/stop', {method: 'POST'}).then(() => {
+        const img = document.getElementById('videoStream');
+        const ph = document.getElementById('placeholder');
+        img.style.display = "none"; img.src = ""; ph.style.display = "flex";
+
+        // 【修改点】确保文字是白色（样式已改，这里只改结构）
+        ph.innerHTML = "<div style='font-size:3rem'>🛑</div><p>检测已停止</p>";
+
+        stopPollingResults();
+        let attempt = 0;
+        const finalCheckInterval = setInterval(() => { fetchResults(); attempt++; if (attempt >= 6) clearInterval(finalCheckInterval); }, 500);
+    });
+}
+
+function startPollingResults(clearTable = false) {
+    if (pollingInterval) clearInterval(pollingInterval);
+    if (clearTable) document.querySelector('#resultTable tbody').innerHTML = "";
+    pollingInterval = setInterval(() => { fetchResults(); }, 1000);
+}
+function stopPollingResults() { if (pollingInterval) clearInterval(pollingInterval); }
+
+function fetchResults() {
+    fetch('/api/results').then(res => res.json()).then(paths => {
+        const tbody = document.querySelector('#resultTable tbody');
+        const currentRows = tbody.children.length;
+        if (paths.length > currentRows) {
+            for (let i = currentRows; i < paths.length; i++) {
+                const tr = document.createElement('tr');
+                const tdIndex = document.createElement('td'); tdIndex.innerText = i + 1;
+                const tdPath = document.createElement('td'); tdPath.innerText = paths[i];
+                tr.appendChild(tdIndex); tr.appendChild(tdPath);
+                tbody.appendChild(tr);
+            }
+            const wrapper = document.querySelector('.table-wrapper');
+            wrapper.scrollTop = wrapper.scrollHeight;
+        }
+    });
+}
+
+// --- AI Chat ---
+function toggleChat() {
+    const win = document.getElementById('chatWindow');
+    if (win.style.display === 'flex') {
+        win.style.display = 'none';
+    } else {
+        document.getElementById('chartWindow').style.display = 'none';
+        win.style.display = 'flex';
+        setTimeout(() => document.getElementById('chatInput').focus(), 100);
+    }
+}
+function handleEnter(e) { if (e.key === 'Enter') sendMessage(); }
+async function sendMessage() {
+    const input = document.getElementById('chatInput');
+    const msg = input.value.trim();
+    if (!msg) return;
+    appendMessage('user', msg);
+    input.value = '';
+    const botMsgDiv = appendMessage('bot', '✨ AI 正在思考中...');
+    botMsgDiv.classList.add('loading-rainbow');
+    let fullMarkdownText = "";
+    let isFirstChunk = true;
+    try {
+        const response = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: msg}) });
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (isFirstChunk) { botMsgDiv.classList.remove('loading-rainbow'); botMsgDiv.innerHTML = ""; isFirstChunk = false; }
+            const chunk = decoder.decode(value, {stream: true});
+            fullMarkdownText += chunk;
+            botMsgDiv.innerHTML = marked.parse(fullMarkdownText);
+            const body = document.getElementById('chatBody');
+            body.scrollTop = body.scrollHeight;
+        }
+    } catch (err) {
+        botMsgDiv.classList.remove('loading-rainbow');
+        botMsgDiv.innerHTML += `<br><span style="color:red">[❌ 网络/API 错误: ${err}]</span>`;
+    }
+}
+function appendMessage(role, text) {
+    const body = document.getElementById('chatBody');
+    const div = document.createElement('div');
+    div.className = `chat-msg ${role}`;
+    div.innerText = text;
+    body.appendChild(div);
+    body.scrollTop = body.scrollHeight;
+    return div;
+}
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\static\style.css ==========
+
+/* static/style.css */
+:root { --bg-color: #f8f9fa; --card-bg: #ffffff; --primary: #007bff; --success: #28a745; --warning: #fd7e14; --danger: #dc3545; --border: #dee2e6; --text-dark: #343a40; }
+body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background-color: var(--bg-color); color: var(--text-dark); margin: 0; padding: 20px; height: 100vh; box-sizing: border-box; display: flex; flex-direction: column; }
+
+/* 彩虹动态 Header */
+@keyframes rainbow-flow {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+.rainbow-header {
+    background: linear-gradient(90deg, #ff9a9e, #fad0c4, #fad0c4, #a18cd1, #fbc2eb);
+    background-size: 400% 400%;
+    animation: rainbow-flow 10s ease infinite;
+    color: #333;
+    padding: 15px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+    text-align: center;
+    margin-bottom: 20px;
+}
+.header h1 { margin: 0; font-family: "FangSong", serif; font-weight: bold; font-size: 2.2rem; letter-spacing: 2px;}
+
+/* 布局 */
+.main-layout { display: flex; gap: 20px; flex: 1; height: 0; min-height: 500px; }
+.sidebar { flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.05); max-width: 350px; overflow-y: auto; }
+.display-area { flex: 2; background: #000; border-radius: 8px; display: flex; justify-content: center; align-items: center; overflow: hidden; position: relative; border: 4px solid #333; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+#videoStream { max-width: 100%; max-height: 100%; display: none; }
+
+/* 【修改点4 & 5】占位符（等待运行/停止）文字设为白色 */
+.placeholder { color: #fff; text-align: center; font-weight: bold; }
+
+.results-panel { flex: 1; background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+.table-wrapper { flex: 1; overflow-y: auto; margin-top: 5px; border: 1px solid #eee; border-radius: 4px; }
+table { width: 100%; border-collapse: collapse; }
+th, td { border-bottom: 1px solid #f0f0f0; padding: 10px 8px; text-align: left; font-size: 13px; }
+th { background-color: #f8f9fa; color: #495057; position: sticky; top: 0; z-index: 1; font-weight: 600; border-bottom: 2px solid #dee2e6; }
+
+/* 控件 */
+.control-group { margin-bottom: 15px; }
+.section-title { border-bottom: 1px solid #eee; padding-bottom: 10px; margin-top: 0; }
+label { display: block; font-weight: 600; margin-bottom: 5px; font-size: 14px; }
+input[type="text"], input[type="number"] { width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; box-sizing: border-box; background-color: #fff; font-family: inherit; }
+.radio-group { display: flex; gap: 15px; margin-bottom: 10px; }
+.checkbox-item { margin-bottom: 5px; cursor: pointer; font-size: 14px;}
+.btn-group { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 15px; border-top: 1px solid #eee;}
+.btn { width: 100%; padding: 12px; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; color: white; transition: all 0.2s; display: flex; justify-content: center; align-items: center; gap: 8px; }
+.btn-run { background-color: var(--success); }
+.btn-pause { background-color: var(--warning); }
+.btn-stop { background-color: var(--danger); }
+.btn:hover { opacity: 0.9; transform: translateY(-1px); }
+.btn-clear { background-color: #fff; border: 1px solid #dc3545; color: #dc3545; border-radius: 4px; padding: 4px 10px; cursor: pointer; font-size: 12px; transition: all 0.2s; }
+.btn-clear:hover { background-color: #dc3545; color: white; }
+
+/* 悬浮组件 */
+.float-widget-container { position: fixed; bottom: 30px; right: 30px; z-index: 9999; display: flex; flex-direction: column; align-items: flex-end; gap: 15px; }
+.float-btn { display: flex; align-items: center; color: white; border: none; border-radius: 50px; height: 50px; width: 50px; padding: 0; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.3); overflow: hidden; transition: width 0.3s ease, transform 0.2s; }
+.float-btn .icon { width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; font-size: 24px; flex-shrink: 0; }
+.float-btn .text { white-space: nowrap; opacity: 0; font-weight: bold; font-size: 16px; padding-right: 20px; transition: opacity 0.2s ease; }
+.float-btn:hover { width: 140px; transform: translateY(-2px); }
+.float-btn:hover .text { opacity: 1; }
+.ai-btn { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+.chart-btn { background: linear-gradient(135deg, #20bf55 0%, #01baef 100%); }
+
+/* --- 悬浮窗口通用配置 --- */
+.float-window {
+    display: none;
+    position: absolute;
+    bottom: 70px;
+    right: 0;
+    background-color: white;
+    border-radius: 12px;
+    box-shadow: 0 5px 30px rgba(0,0,0,0.25);
+    flex-direction: column;
+    overflow: hidden;
+    border: 1px solid #e0e0e0;
+
+    /* 核心适配：最大宽度不超过屏幕减去边距，确保不被切掉 */
+    max-width: calc(100vw - 60px);
+    max-height: calc(100vh - 150px);
+
+    /* 默认基础宽度 (两个窗口共用) */
+    width: 400px;
+}
+
+/* AI 窗口特定高度 */
+.chat-window { height: 550px; }
+
+/* 【修改点1】图表窗口 */
+/* 删除了任何关于 width 的设置，让它完全继承 .float-window 的 width: 400px */
+/* 这样它就会同样受到 max-width 的约束 */
+.chart-window {
+    height: 400px;
+    bottom: 140px;
+}
+
+.window-header { color: white; padding: 15px; font-weight: bold; display: flex; justify-content: space-between; align-items: center; flex-shrink: 0; }
+.ai-header-bg { background: #667eea; }
+.chart-header-bg { background: #01baef; }
+.close-btn { cursor: pointer; font-size: 18px; opacity: 0.8; transition: opacity 0.2s; }
+.close-btn:hover { opacity: 1; }
+.window-body { flex: 1; padding: 15px; overflow-y: auto; background-color: #f9f9f9; }
+
+/* 聊天内容 */
+.chat-body { flex: 1; padding: 15px; overflow-y: auto; background-color: #f9f9f9; display: flex; flex-direction: column; gap: 15px; }
+.chat-msg { max-width: 85%; padding: 10px 14px; border-radius: 10px; font-size: 14px; line-height: 1.6; word-wrap: break-word; height: auto; overflow: visible; box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+.chat-msg.bot { background-color: white; border: 1px solid #e5e7eb; align-self: flex-start; border-bottom-left-radius: 2px; }
+.chat-msg.user { background-color: #667eea; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+.chat-footer { padding: 10px; border-top: 1px solid #eee; display: flex; gap: 5px; background: white; flex-shrink: 0; }
+.chat-footer input { flex: 1; padding: 10px; border: 1px solid #ddd; border-radius: 20px; outline: none; }
+.chat-footer button { background: #667eea; color: white; border: none; padding: 0 20px; border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+.chat-footer button:hover { background: #5a67d8; }
+
+/* 动画 */
+@keyframes rainbow-move { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+.loading-rainbow { background: linear-gradient(270deg, #ff9a9e, #fad0c4, #ffd1ff, #a18cd1, #fbc2eb); background-size: 400% 400%; animation: rainbow-move 3s ease infinite; color: #4a4a4a; border: none !important; font-weight: bold; }
+
+/* Markdown */
+.chat-msg.bot h1, .chat-msg.bot h2, .chat-msg.bot h3 { margin-top: 10px; margin-bottom: 5px; font-size: 1.1em; border-bottom: 1px solid #eee; }
+.chat-msg.bot ul, .chat-msg.bot ol { padding-left: 20px; margin: 5px 0; }
+.chat-msg.bot table { border-collapse: collapse; width: 100%; margin: 10px 0; font-size: 12px; display: block; overflow-x: auto; }
+.chat-msg.bot th, .chat-msg.bot td { border: 1px solid #ddd; padding: 6px; text-align: left; }
+.chat-msg.bot th { background-color: #f2f2f2; font-weight: bold; }
+.chat-msg.bot pre { background: #2d2d2d; color: #f8f8f2; padding: 10px; border-radius: 4px; overflow-x: auto; margin: 10px 0; }
+.chat-msg.bot code { background: #f0f0f0; padding: 2px 4px; border-radius: 3px; font-family: Consolas, monospace; }
+.chat-msg.bot pre code { background: none; color: inherit; }
+
+/* 媒体查询 */
+@media (max-width: 768px) {
+    body { padding: 10px; }
+    .main-layout { flex-direction: column; height: auto; }
+    .sidebar, .display-area, .results-panel { max-width: 100%; width: 100%; }
+    .display-area { height: 300px; }
+    .results-panel { height: 300px; }
+    .float-window { width: 90%; right: 5%; bottom: 90px; height: 60vh; }
+    .chart-window { bottom: 160px; }
+}
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\templates\index.html ==========
+
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv11 智能检测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+
+    <div class="header rainbow-header">
+        <h1>🚀 基于 YOLOv11 目标检测系统 (Web版)</h1>
+    </div>
+
+    <div class="main-layout">
+        <div class="sidebar">
+            <h3 class="section-title">⚙️ 输入源与参数</h3>
+
+            <div class="control-group">
+                <label>📡 输入类型</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="inputType" value="path" checked onchange="toggleInput(this.value)">
+                        📂 文件/文件夹
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="inputType" value="camera" onchange="toggleInput(this.value)">
+                        📷 摄像头
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group" id="pathInputGroup">
+                <label>📍 本地路径 (点选 example 或 手动输入)</label>
+                <input type="text" id="pathInput" list="pathOptions" placeholder="📂 点击选择或粘贴路径..." onfocus="this.value=''">
+                <datalist id="pathOptions"></datalist>
+            </div>
+
+            <div class="control-group">
+                <label>🧠 模型选择 (点选 models 或 手动输入)</label>
+                <input type="text" id="modelInput" list="modelOptions" placeholder="🤖 点击这里选择模型..." onfocus="this.value=''">
+                <datalist id="modelOptions"></datalist>
+            </div>
+
+            <div class="control-group">
+                <label>🎯 置信度 (Conf)</label>
+                <input type="number" id="confThres" step="0.01" min="0" max="1" value="0.25">
+            </div>
+
+            <div class="control-group">
+                <label>🧩 IOU 阈值</label>
+                <input type="number" id="iouThres" step="0.01" min="0" max="1" value="0.45">
+            </div>
+
+            <div class="control-group">
+                <label>📏 图像尺寸 (Size)</label>
+                <input type="number" id="imgSz" value="640">
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 5px;">💾 保存选项</label>
+                <div class="checkbox-item"><input type="checkbox" id="saveTxt"> 📝 保存 TXT</div>
+                <div class="checkbox-item"><input type="checkbox" id="saveConf"> 📊 保存置信度</div>
+                <div class="checkbox-item"><input type="checkbox" id="saveCrop"> 🖼️ 保存截图 (Crop)</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-run" onclick="startSystem()">▶️ 运行代码 (Run)</button>
+                <button id="btnPause" class="btn btn-pause" onclick="pauseSystem()">⏸️ 暂停 (Pause)</button>
+                <button class="btn btn-stop" onclick="stopSystem()">⏹️ 终止推理 (Stop)</button>
+            </div>
+        </div>
+
+        <div class="display-area">
+            <div class="placeholder" id="placeholder">
+                <div style="font-size: 3rem;">📺</div>
+                <p>等待运行...</p>
+            </div>
+            <img id="videoStream" src="">
+        </div>
+
+        <div class="results-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+                <h3 style="margin:0; font-size:16px;">📋 检测结果列表</h3>
+                <button class="btn-clear" onclick="clearResults()">🗑️ 清空列表</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="resultTable">
+                    <thead><tr><th style="width: 60px;">#️⃣ 序号</th><th>📂 结果保存路径</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="float-widget-container">
+
+        <div class="float-window chart-window" id="chartWindow">
+            <div class="window-header chart-header-bg">
+                <span>📊 实时检测统计</span>
+                <span class="close-btn" onclick="toggleChart()">✖</span>
+            </div>
+            <div class="window-body">
+                <div id="mainChart" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+
+        <div class="float-window chat-window" id="chatWindow">
+            <div class="window-header ai-header-bg">
+                <span>🤖 智能助手</span>
+                <span class="close-btn" onclick="toggleChat()">✖</span>
+            </div>
+            <div class="chat-body" id="chatBody">
+                <div class="chat-msg bot">你好！我是你的 AI 助手，有什么可以帮你的吗？</div>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chatInput" placeholder="输入问题..." onkeypress="handleEnter(event)">
+                <button onclick="sendMessage()">🚀 发送</button>
+            </div>
+        </div>
+
+        <div class="float-btn-group">
+            <button class="float-btn chart-btn" onclick="toggleChart()" title="查看实时统计">
+                <span class="icon">📊</span>
+                <span class="text">实时统计</span>
+            </button>
+            <button class="float-btn ai-btn" onclick="toggleChat()" title="点击召唤 AI 助手">
+                <span class="icon">🤖</span>
+                <span class="text">AI 助手</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\ai_api.py ==========
+
+# ai_api.py
+import requests
+import json
+
+API_KEY = "c0a5e654-d53a-4480-87f8-a7956b27601d"
+MODEL_ID = "doubao-seed-1-6-251015"
+API_URL = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+
+
+class DoubaoClient:
+    def __init__(self):
+        self.api_key = API_KEY
+        self.model_id = MODEL_ID
+        self.api_url = API_URL
+        self.history = [
+            {
+                "role": "system",
+                "content": "你是一个乐于助人的AI助手，请准确、友好地回答用户的任何问题。"
+            }
+        ]
+
+    # 改名为 get_response_stream 以示区别
+    def get_response_stream(self, user_input):
+        self.history.append({"role": "user", "content": user_input})
+
+        headers = {
+            "Content-Type": "application/json",
+            "X-Volc-Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}"
+        }
+
+        # 【修改1】开启流式
+        payload = {
+            "model": self.model_id,
+            "messages": self.history,
+            "stream": True,
+            "max_tokens": 2048
+        }
+
+        full_content = ""  # 用于记录完整回复，存入历史
+
+        try:
+            # 【修改2】stream=True，保留 proxies=None 解决代理问题
+            resp = requests.post(
+                self.api_url,
+                headers=headers,
+                json=payload,
+                timeout=None,
+                proxies={"http": None, "https": None},
+                stream=True
+            )
+
+            if resp.status_code != 200:
+                yield f"Error: {resp.status_code} - {resp.text}"
+                return
+
+            # 【修改3】按行读取流数据
+            for line in resp.iter_lines():
+                if not line:
+                    continue
+
+                # 数据格式通常是: data: {...json...}
+                decoded_line = line.decode('utf-8').strip()
+
+                if decoded_line.startswith("data:"):
+                    json_str = decoded_line[5:].strip()  # 去掉 "data:"
+
+                    if json_str == "[DONE]":  # 结束标志
+                        break
+
+                    try:
+                        data = json.loads(json_str)
+                        if "choices" in data:
+                            # 提取增量内容 (delta)
+                            delta = data["choices"][0].get("delta", {}).get("content", "")
+                            if delta:
+                                full_content += delta
+                                yield delta  # 【核心】把这几个字立刻吐给前端
+                    except json.JSONDecodeError:
+                        continue
+
+            # 对话结束后，把完整的回答存入历史
+            self.history.append({"role": "assistant", "content": full_content})
+
+        except Exception as e:
+            yield f"Network Error: {str(e)}"
+
+    def clear_history(self):
+        self.history = [
+            {
+                "role": "system",
+                "content": "你是一个乐于助人的AI助手，请准确、友好地回答用户的任何问题。"
+            }
+        ]
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\app.py ==========
+
+# app.py
+import os
+import sys
+from flask import Flask, render_template, Response, request, jsonify, stream_with_context
+from web_inference import WebDetector
+from ai_api import DoubaoClient
+
+app = Flask(__name__)
+detector = WebDetector()
+ai_client = DoubaoClient()
+
+# --- 路径配置 ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODELS_DIR = os.path.join(BASE_DIR, 'models')
+EXAMPLES_DIR = os.path.join(BASE_DIR, 'example')
+
+# --- 启动自检 ---
+print("-" * 50)
+print(f"【系统自检】正在检查文件夹路径...")
+print(f"1. 项目根目录: {BASE_DIR}")
+print(f"2. 模型文件夹: {MODELS_DIR}")
+
+if not os.path.exists(MODELS_DIR):
+    print(f"   [❌ 错误] models 文件夹不存在！请在 app.py 同级目录下创建 models 文件夹。")
+    os.makedirs(MODELS_DIR)
+else:
+    files = [f for f in os.listdir(MODELS_DIR) if f.endswith('.pt')]
+    print(f"   [✅ 正常] 发现 {len(files)} 个模型文件: {files}")
+
+print(f"3. 示例文件夹: {EXAMPLES_DIR}")
+if not os.path.exists(EXAMPLES_DIR):
+    os.makedirs(EXAMPLES_DIR)
+print("-" * 50)
+
+
+# --- 路由定义 ---
+
+@app.route('/')
+def index():
+    return render_template('index.html')
+
+
+@app.route('/video_feed')
+def video_feed():
+    return Response(detector.gen_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route('/api/models')
+def list_models():
+    try:
+        if not os.path.exists(MODELS_DIR):
+            return jsonify([])
+        files = [f for f in os.listdir(MODELS_DIR)
+                 if (f.lower().endswith('.pt') or f.lower().endswith('.pth'))]
+        return jsonify(files)
+    except Exception as e:
+        print(f"Error reading models: {e}")
+        return jsonify([])
+
+
+@app.route('/api/examples')
+def list_examples():
+    try:
+        if not os.path.exists(EXAMPLES_DIR):
+            return jsonify([])
+        files = [f for f in os.listdir(EXAMPLES_DIR) if os.path.isfile(os.path.join(EXAMPLES_DIR, f))]
+        paths = [os.path.join('example', f).replace('\\', '/') for f in files]
+        return jsonify(paths)
+    except Exception:
+        return jsonify([])
+
+
+@app.route('/api/start', methods=['POST'])
+def start_detection():
+    data = request.json
+
+    model_input = data.get('model_name', '').strip()
+    if os.path.sep in model_input or '/' in model_input:
+        full_model_path = model_input
+    else:
+        full_model_path = os.path.join(MODELS_DIR, model_input)
+
+    input_type = data.get('input_type')
+    source = 'camera' if input_type == 'camera' else data.get('path_input', '').strip()
+
+    params = {
+        "model_path": full_model_path,
+        "source": source,
+        "conf_thres": float(data.get('conf_thres', 0.25)),
+        "iou_thres": float(data.get('iou_thres', 0.45)),
+        "imgsz": int(data.get('imgsz', 640)),
+        "save_txt": data.get('save_txt', False),
+        "save_conf": data.get('save_conf', False),
+        "save_crop": data.get('save_crop', False)
+    }
+
+    detector.update_params(params)
+    return jsonify({"status": "started"})
+
+
+@app.route('/api/pause', methods=['POST'])
+def pause_detection():
+    is_paused = detector.toggle_pause()
+    return jsonify({"status": "paused" if is_paused else "resumed", "is_paused": is_paused})
+
+
+@app.route('/api/stop', methods=['POST'])
+def stop_detection():
+    detector.stop_event = True
+    return jsonify({"status": "stopped"})
+
+
+@app.route('/api/results')
+def get_results():
+    with detector.results_lock:
+        return jsonify(detector.recent_results)
+
+
+@app.route('/api/clear_results', methods=['POST'])
+def clear_results():
+    detector.clear_results()
+    return jsonify({"status": "cleared"})
+
+
+# --- 新增：获取实时统计数据 API ---
+@app.route('/api/stats')
+def get_stats():
+    with detector.stats_lock:
+        return jsonify(detector.current_stats)
+
+
+@app.route('/api/chat', methods=['POST'])
+def chat_with_ai():
+    data = request.json
+    user_msg = data.get('message', '')
+    if not user_msg:
+        return "请输入内容", 400
+
+    def generate():
+        for chunk in ai_client.get_response_stream(user_msg):
+            yield chunk
+
+    return Response(stream_with_context(generate()), mimetype='text/plain')
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\web_inference.py ==========
+
+# web_inference.py
+import cv2
+import time
+import threading
+from pathlib import Path
+from ultralytics import YOLO
+from collections import Counter
+from yolo_io_utils import (
+    create_exp_dir, ensure_labels_dir, ensure_crops_dir,
+    split_media, build_videowriter, save_annotated_image, save_txt, save_crops,
+    IMAGE_EXTS, VIDEO_EXTS
+)
+
+
+class WebDetector:
+    def __init__(self):
+        self.model = None
+        self.model_path = None
+        self.is_running = False
+        self.is_paused = False
+        self.stop_event = False
+
+        # 结果列表
+        self.recent_results = []
+        self.results_lock = threading.Lock()
+
+        # --- 新增：实时统计数据 ---
+        self.current_stats = {}
+        self.stats_lock = threading.Lock()
+
+        # 默认参数
+        self.params = {
+            "source": "",
+            "model_path": "yolo11n.pt",
+            "conf_thres": 0.25,
+            "iou_thres": 0.45,
+            "imgsz": 640,
+            "save_txt": False,
+            "save_conf": False,
+            "save_crop": False
+        }
+
+    def clear_results(self):
+        with self.results_lock:
+            self.recent_results = []
+            print("[Info] 后端结果列表已清空")
+
+    def update_params(self, new_params):
+        if "model_path" in new_params and new_params["model_path"] != self.model_path:
+            try:
+                self.model = YOLO(new_params["model_path"])
+                self.model_path = new_params["model_path"]
+                print(f"模型已加载: {self.model_path}")
+            except Exception as e:
+                print(f"模型加载失败: {e}")
+
+        self.params.update(new_params)
+
+    def _infer_single_frame(self, frame, stem, exp_dir, labels_dir, crops_root):
+        results = self.model.predict(
+            frame,
+            conf=float(self.params["conf_thres"]),
+            iou=float(self.params["iou_thres"]),
+            imgsz=int(self.params["imgsz"]),
+            agnostic_nms=True,
+            verbose=False
+        )[0]
+        im0 = results.plot()
+
+        boxes = results.boxes.xyxy.tolist()
+        confs = results.boxes.conf.tolist()
+        clss = results.boxes.cls.tolist()
+        names = results.names
+
+        # --- 统计当前帧类别 ---
+        detected_names = [names[int(cls)] for cls in clss]
+        stats_counter = Counter(detected_names)
+        with self.stats_lock:
+            self.current_stats = dict(stats_counter)
+
+        if self.params["save_txt"] and labels_dir:
+            txt_path = labels_dir / f"{stem}.txt"
+            save_txt(txt_path, boxes, clss, confs, self.params["save_conf"])
+
+        if self.params["save_crop"] and crops_root:
+            save_crops(crops_root, stem, results.orig_img, boxes, clss, names)
+
+        return im0
+
+    def toggle_pause(self):
+        self.is_paused = not self.is_paused
+        return self.is_paused
+
+    def gen_frames(self):
+        self.is_running = True
+        self.stop_event = False
+        self.is_paused = False
+
+        # 清空统计
+        with self.stats_lock:
+            self.current_stats = {}
+
+        source = self.params["source"]
+        exp_dir = create_exp_dir('runs', 'web_exp')
+        labels_dir = ensure_labels_dir(exp_dir) if self.params["save_txt"] else None
+        crops_root = ensure_crops_dir(exp_dir) if self.params["save_crop"] else None
+
+        # --- 摄像头模式 ---
+        if source == "camera":
+            cap = cv2.VideoCapture(0)
+            vid_writer = None
+            out_path = exp_dir / f"camera_{int(time.time())}.mp4"
+
+            try:
+                while self.is_running and cap.isOpened() and not self.stop_event:
+                    if self.is_paused:
+                        time.sleep(0.1)
+                        continue
+
+                    success, frame = cap.read()
+                    if not success: break
+
+                    im0 = self._infer_single_frame(frame, f"cam_{time.time()}", exp_dir, labels_dir, crops_root)
+
+                    if vid_writer is None:
+                        h, w = im0.shape[:2]
+                        vid_writer = build_videowriter(out_path, 25, (w, h))
+                    vid_writer.write(im0)
+
+                    ret, buffer = cv2.imencode('.jpg', im0)
+                    yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+            finally:
+                cap.release()
+                if vid_writer:
+                    vid_writer.release()
+                    with self.results_lock:
+                        self.recent_results.append(str(out_path))
+
+        # --- 文件/文件夹模式 ---
+        else:
+            path_obj = Path(source)
+            files_to_process = []
+
+            if path_obj.is_dir():
+                imgs, vids = split_media(path_obj)
+                files_to_process = imgs + vids
+            elif path_obj.is_file():
+                files_to_process = [path_obj]
+
+            if not files_to_process:
+                err_img = self._make_err_img()
+                yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + cv2.imencode('.jpg', err_img)[
+                    1].tobytes() + b'\r\n')
+                self.is_running = False
+                return
+
+            for file_path in files_to_process:
+                if not self.is_running or self.stop_event: break
+
+                if file_path.suffix.lower() in VIDEO_EXTS:
+                    cap = cv2.VideoCapture(str(file_path))
+                    out_name = exp_dir / f"{file_path.stem}_out.mp4"
+                    vid_writer = None
+
+                    try:
+                        while cap.isOpened() and self.is_running and not self.stop_event:
+                            if self.is_paused:
+                                time.sleep(0.1)
+                                continue
+
+                            success, frame = cap.read()
+                            if not success: break
+
+                            im0 = self._infer_single_frame(frame, f"{file_path.stem}_{int(time.time())}", exp_dir,
+                                                           labels_dir, crops_root)
+
+                            if vid_writer is None:
+                                h, w = im0.shape[:2]
+                                vid_writer = build_videowriter(out_name, 30, (w, h))
+                            vid_writer.write(im0)
+
+                            ret, buffer = cv2.imencode('.jpg', im0)
+                            yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+
+                    finally:
+                        cap.release()
+                        if vid_writer:
+                            vid_writer.release()
+                            with self.results_lock:
+                                self.recent_results.append(str(out_name))
+                else:
+                    # 图片模式
+                    while self.is_paused and self.is_running and not self.stop_event:
+                        time.sleep(0.1)
+
+                    frame = cv2.imread(str(file_path))
+                    if frame is None: continue
+
+                    im0 = self._infer_single_frame(frame, file_path.stem, exp_dir, labels_dir, crops_root)
+                    save_path = exp_dir / f"{file_path.stem}_res.jpg"
+                    save_annotated_image(im0, save_path)
+
+                    with self.results_lock:
+                        self.recent_results.append(str(save_path))
+
+                    for _ in range(10):
+                        if not self.is_running or self.stop_event: break
+                        ret, buffer = cv2.imencode('.jpg', im0)
+                        yield (b'--frame\r\nContent-Type: image/jpeg\r\n\r\n' + buffer.tobytes() + b'\r\n')
+                        time.sleep(0.1)
+
+        self.is_running = False
+
+    def _make_err_img(self):
+        import numpy as np
+        img = np.zeros((480, 640, 3), dtype=np.uint8)
+        cv2.putText(img, "No Files Found", (50, 240), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 0, 255), 2)
+        return img
+
+
+========== FILE: E:\LEAR-CODE\my_yolo_web\yolo_io_utils.py ==========
+
+# yolo_io_utils.py
+from __future__ import annotations
+from pathlib import Path
+from typing import List, Tuple, Sequence, Dict, Optional
+import re
+import cv2
+import os
+
+IMAGE_EXTS = {
+    ".jpg", ".jpeg", ".png", ".bmp", ".gif", ".tiff", ".webp",
+    ".heif", ".raw", ".ico", ".jfif"
+}
+
+VIDEO_EXTS = {
+    ".mp4", ".avi", ".mov", ".mkv", ".flv", ".webm", ".wmv",
+    ".mpeg", ".mpg", ".3gp", ".ts"
+}
+
+
+def contains_chinese(s: str) -> bool:
+    return bool(re.search(r"[\u4e00-\u9fff]", s))
+
+
+def ensure_dir(p: Path | str) -> Path:
+    p = Path(p)
+    p.mkdir(parents=True, exist_ok=True)
+    return p
+
+
+def create_exp_dir(base: Path | str = "runs", prefix: str = "exp") -> Path:
+    base = ensure_dir(base)
+    exp = base / prefix
+    if not exp.exists():
+        exp.mkdir()
+        return exp
+    i = 1
+    while True:
+        cand = base / f"{prefix}{i}"
+        if not cand.exists():
+            cand.mkdir()
+            return cand
+        i += 1
+
+
+def ensure_labels_dir(exp_dir: Path | str) -> Path:
+    return ensure_dir(Path(exp_dir) / "labels")
+
+
+def ensure_crops_dir(exp_dir: Path | str) -> Path:
+    return ensure_dir(Path(exp_dir) / "crops")
+
+
+def split_media(dir_path: Path | str) -> Tuple[List[Path], List[Path]]:
+    dir_path = Path(dir_path)
+    images, videos = [], []
+    if not dir_path.exists():
+        return [], []
+    for f in dir_path.iterdir():
+        if not f.is_file():
+            continue
+        ext = f.suffix.lower()
+        if ext in IMAGE_EXTS:
+            images.append(f)
+        elif ext in VIDEO_EXTS:
+            videos.append(f)
+    return images, videos
+
+
+def build_videowriter(output_path: Path | str, fps: float, size: tuple[int, int],
+                      fourcc: str = "mp4v") -> cv2.VideoWriter:
+    output_path = str(output_path)
+    fourcc_val = cv2.VideoWriter_fourcc(*fourcc)
+    return cv2.VideoWriter(output_path, fourcc_val, fps, size)
+
+
+def save_annotated_image(im_bgr, save_path: Path | str) -> None:
+    cv2.imwrite(str(save_path), im_bgr)
+
+
+def save_txt(txt_path: Path | str, boxes, classes, confs=None, save_conf=False) -> None:
+    txt_path = Path(txt_path)
+    ensure_dir(txt_path.parent)
+    with txt_path.open("w", encoding="utf-8") as f:
+        if save_conf and confs is not None:
+            for loc, cls, conf in zip(boxes, classes, confs):
+                x1, y1, x2, y2 = map(int, map(round, loc))
+                f.write(f"{int(cls)} {x1} {y1} {x2} {y2} {float(conf):.4f}\n")
+        else:
+            for loc, cls in zip(boxes, classes):
+                x1, y1, x2, y2 = map(int, map(round, loc))
+                f.write(f"{int(cls)} {x1} {y1} {x2} {y2}\n")
+
+
+def save_crops(crops_root: Path | str, base_stem: str, frame_bgr, boxes, classes, names_map) -> None:
+    crops_root = ensure_dir(crops_root)
+    H, W = frame_bgr.shape[:2]
+    for i, (loc, cls) in enumerate(zip(boxes, classes)):
+        cls_idx = int(cls)
+        if names_map is None:
+            class_name = str(cls_idx)
+        elif isinstance(names_map, dict):
+            class_name = names_map.get(cls_idx, str(cls_idx))
+        else:
+            class_name = (names_map[cls_idx] if 0 <= cls_idx < len(names_map) else str(cls_idx))
+
+        class_dir = ensure_dir(Path(crops_root) / class_name)
+        x1, y1, x2, y2 = map(int, map(round, loc))
+        x1, x2 = max(0, min(x1, W)), max(0, min(x2, W))
+        y1, y2 = max(0, min(y1, H)), max(0, min(y2, H))
+        if x2 <= x1 or y2 <= y1: continue
+        crop = frame_bgr[y1:y2, x1:x2]
+        out_path = class_dir / f"{base_stem}_{class_name}_{i}.jpg"
+        cv2.imwrite(str(out_path), crop)
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\sql\schema.sql ==========
+
+-- 智学空间 数据库初始化脚本
+-- 创建数据库
+CREATE DATABASE IF NOT EXISTS smart_campus DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
+
+USE smart_campus;
+
+-- 用户表
+CREATE TABLE IF NOT EXISTS sys_user (
+    user_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    username VARCHAR(50) NOT NULL,
+    password VARCHAR(100) NOT NULL,
+    real_name VARCHAR(50),
+    role INT DEFAULT 2 COMMENT '0:管理员, 1:老师, 2:学生',
+    credit_score INT DEFAULT 100
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='用户表';
+
+-- 教室表
+CREATE TABLE IF NOT EXISTS sys_classroom (
+    room_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    room_name VARCHAR(50),
+    capacity INT,
+    camera_url VARCHAR(255),
+    is_active TINYINT DEFAULT 1
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='教室表';
+
+-- 视觉数据日志表 (核心业务)
+CREATE TABLE IF NOT EXISTS visual_stats_log (
+    log_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    room_id BIGINT,
+    person_count INT,
+    phone_count INT,
+    focus_index DOUBLE,
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    raw_json TEXT
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视觉数据日志表';
+
+-- 预约表
+CREATE TABLE IF NOT EXISTS seat_booking (
+    booking_id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    user_id BIGINT,
+    room_id BIGINT,
+    seat_number VARCHAR(20),
+    start_time DATETIME,
+    end_time DATETIME,
+    status INT DEFAULT 0 COMMENT '0:已预约, 1:使用中, 2:已签退, 3:违规'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='座位预约表';
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\common\Result.java ==========
+
+package com.smartcampus.common;
+
+import lombok.Data;
+
+import java.io.Serializable;
+
+/**
+ * 通用返回结果类
+ * @param <T> 数据类型
+ */
+@Data
+public class Result<T> implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    private Integer code;
+    private String msg;
+    private T data;
+
+    public Result() {
+    }
+
+    public Result(Integer code, String msg, T data) {
+        this.code = code;
+        this.msg = msg;
+        this.data = data;
+    }
+
+    public static <T> Result<T> success() {
+        return new Result<T>(200, "操作成功", null);
+    }
+
+    public static <T> Result<T> success(T data) {
+        return new Result<T>(200, "操作成功", data);
+    }
+
+    public static <T> Result<T> success(String msg, T data) {
+        return new Result<T>(200, msg, data);
+    }
+
+    public static <T> Result<T> error() {
+        return new Result<T>(500, "操作失败", null);
+    }
+
+    public static <T> Result<T> error(String msg) {
+        return new Result<T>(500, msg, null);
+    }
+
+    public static <T> Result<T> error(Integer code, String msg) {
+        return new Result<T>(code, msg, null);
+    }
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\config\WebConfig.java ==========
+
+package com.smartcampus.config;
+
+import org.springframework.context.annotation.Configuration;
+import org.springframework.web.servlet.config.annotation.CorsRegistry;
+import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+
+/**
+ * Web配置类 - 解决跨域问题
+ */
+@Configuration
+public class WebConfig implements WebMvcConfigurer {
+
+    @Override
+    public void addCorsMappings(CorsRegistry registry) {
+        registry.addMapping("/**")
+                .allowedOriginPatterns("*")
+                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
+                .allowedHeaders("*")
+                .allowCredentials(true)
+                .maxAge(3600);
+    }
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\controller\ClassroomController.java ==========
+
+package com.smartcampus.controller;
+
+import com.smartcampus.common.Result;
+import com.smartcampus.entity.SysClassroom;
+import com.smartcampus.service.SysClassroomService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+
+/**
+ * 教室Controller
+ */
+@RestController
+@RequestMapping("/api/classroom")
+public class ClassroomController {
+
+    @Autowired
+    private SysClassroomService classroomService;
+
+    /**
+     * 获取所有教室列表
+     */
+    @GetMapping("/list")
+    public Result<List<SysClassroom>> list() {
+        List<SysClassroom> list = classroomService.list();
+        return Result.success(list);
+    }
+
+    /**
+     * 根据ID获取教室详情
+     */
+    @GetMapping("/{id}")
+    public Result<SysClassroom> getById(@PathVariable("id") Long id) {
+        SysClassroom classroom = classroomService.getById(id);
+        if (classroom != null) {
+            return Result.success(classroom);
+        }
+        return Result.error("教室不存在");
+    }
+
+    /**
+     * 新增教室
+     */
+    @PostMapping("/add")
+    public Result<String> add(@RequestBody SysClassroom classroom) {
+        boolean saved = classroomService.save(classroom);
+        if (saved) {
+            return Result.success("新增成功");
+        }
+        return Result.error("新增失败");
+    }
+
+    /**
+     * 更新教室信息
+     */
+    @PutMapping("/update")
+    public Result<String> update(@RequestBody SysClassroom classroom) {
+        boolean updated = classroomService.updateById(classroom);
+        if (updated) {
+            return Result.success("更新成功");
+        }
+        return Result.error("更新失败");
+    }
+
+    /**
+     * 删除教室
+     */
+    @DeleteMapping("/{id}")
+    public Result<String> delete(@PathVariable("id") Long id) {
+        boolean removed = classroomService.removeById(id);
+        if (removed) {
+            return Result.success("删除成功");
+        }
+        return Result.error("删除失败");
+    }
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\controller\DeviceController.java ==========
+
+package com.smartcampus.controller;
+
+import com.smartcampus.common.Result;
+import com.smartcampus.entity.VisualStatsLog;
+import com.smartcampus.service.VisualStatsLogService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Date;
+
+/**
+ * 设备数据接收Controller
+ */
+@RestController
+@RequestMapping("/api/device")
+public class DeviceController {
+
+    @Autowired
+    private VisualStatsLogService visualStatsLogService;
+
+    /**
+     * 接收视觉设备上报的数据
+     * 
+     * @param roomId      教室ID
+     * @param personCount 人数
+     * @param phoneCount  玩手机人数
+     * @return 处理结果
+     */
+    @PostMapping("/receive")
+    public Result<String> receiveData(@RequestParam("roomId") Long roomId,
+            @RequestParam("personCount") Integer personCount,
+            @RequestParam("phoneCount") Integer phoneCount) {
+        // 计算专注度指数，处理分母为0的情况
+        Double focusIndex = 0.0;
+        if (personCount != null && personCount > 0) {
+            focusIndex = (double) (personCount - phoneCount) / personCount;
+        }
+
+        // 构建日志对象并保存
+        VisualStatsLog log = new VisualStatsLog();
+        log.setRoomId(roomId);
+        log.setPersonCount(personCount);
+        log.setPhoneCount(phoneCount);
+        log.setFocusIndex(focusIndex);
+        log.setCreateTime(new Date());
+
+        boolean saved = visualStatsLogService.save(log);
+        if (saved) {
+            System.out.println(">>> [Device] 接收数据成功: 教室=" + roomId + ", 人数=" + personCount + ", 专注度=" + focusIndex);
+            return Result.success("数据接收成功");
+        } else {
+            System.err.println(">>> [Device] 数据保存失败: " + log);
+            return Result.error("数据保存失败");
+        }
+    }
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\controller\StatsController.java ==========
+
+package com.smartcampus.controller;
+
+import com.smartcampus.common.Result;
+import com.smartcampus.mapper.SysClassroomMapper;
+import com.smartcampus.mapper.VisualStatsLogMapper;
+import com.smartcampus.entity.VisualStatsLog;
+import com.smartcampus.service.VisualStatsLogService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
+import java.util.Map;
+import java.util.Random;
+
+/**
+ * 统计分析Controller
+ */
+@RestController
+@RequestMapping("/api/stats")
+@CrossOrigin // 确保跨域请求正常
+public class StatsController {
+
+    @Autowired
+    private VisualStatsLogMapper visualStatsLogMapper;
+
+    @Autowired
+    private SysClassroomMapper sysClassroomMapper;
+
+    @Autowired
+    private VisualStatsLogService visualStatsLogService;
+
+    /**
+     * 重置指定教室的数据并注入过去24小时的拟真趋势数据
+     * 
+     * @param roomId 教室ID
+     * @return 操作结果
+     */
+    @PostMapping("/reset")
+    public Result<String> resetStats(@RequestParam Long roomId) {
+        // 1. 清空该教室的所有历史记录
+        com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<VisualStatsLog> queryWrapper = new com.baomidou.mybatisplus.core.conditions.query.QueryWrapper<>();
+        queryWrapper.eq("room_id", roomId);
+        visualStatsLogService.remove(queryWrapper);
+
+        // 2. 注入过去 24 小时拟真的趋势数据
+        // 使用 roomId 作为固定种子，确保每次重置后数据是固定不变的默认值
+        Random random = new Random(roomId);
+        List<VisualStatsLog> logs = new ArrayList<>();
+
+        // 生成过去24小时数据，每30分钟一条
+        for (int i = 47; i >= 0; i--) {
+            Calendar calendar = Calendar.getInstance();
+            calendar.add(Calendar.MINUTE, -i * 30);
+
+            int hour = calendar.get(Calendar.HOUR_OF_DAY);
+            int minute = calendar.get(Calendar.MINUTE);
+            boolean isClassTime = isInClassTime(hour, minute);
+
+            VisualStatsLog log = new VisualStatsLog();
+            log.setRoomId(roomId);
+
+            int personCount;
+            int phoneCount;
+
+            if (isClassTime) {
+                // 上课时间：80-160人
+                personCount = 80 + random.nextInt(81);
+                phoneCount = 2 + random.nextInt(10);
+            } else {
+                // 休息时间：0-15人
+                personCount = random.nextInt(16);
+                phoneCount = personCount > 0 ? random.nextInt(Math.min(5, personCount + 1)) : 0;
+            }
+
+            log.setPersonCount(personCount);
+            log.setPhoneCount(phoneCount);
+
+            double focusIndex = 0.0;
+            if (personCount > 0) {
+                focusIndex = (double) (personCount - phoneCount) / personCount;
+            }
+            log.setFocusIndex(Math.round(focusIndex * 100.0) / 100.0);
+            log.setCreateTime(calendar.getTime());
+
+            logs.add(log);
+        }
+
+        visualStatsLogService.saveBatch(logs);
+
+        System.out.println(">>> [Stats] 教室 " + roomId + " 数据已重置，已生成 24 小时拟真趋势数据。");
+        return Result.success("该教室数据已重置，包含 24 小时拟真趋势数据");
+    }
+
+    /**
+     * 判断时间是否在上课时段
+     */
+    private boolean isInClassTime(int hour, int minute) {
+        int timeInMinutes = hour * 60 + minute;
+        // 上午 08:00 - 11:50
+        if (timeInMinutes >= 8 * 60 && timeInMinutes < 11 * 60 + 50)
+            return true;
+        // 下午 14:30 - 18:00
+        if (timeInMinutes >= 14 * 60 + 30 && timeInMinutes < 18 * 60)
+            return true;
+        // 晚自习 18:40 - 22:00
+        if (timeInMinutes >= 18 * 60 + 40 && timeInMinutes < 22 * 60)
+            return true;
+        return false;
+    }
+
+    /**
+     * 获取最近24小时专注度趋势数据
+     * 
+     * @return 按小时分组的平均专注度
+     */
+    @GetMapping("/trend")
+    public Result<List<Map<String, Object>>> getTrend(@RequestParam Long roomId) {
+        List<Map<String, Object>> trendData = visualStatsLogMapper.selectTrendLast24Hours(roomId);
+        return Result.success(trendData);
+    }
+
+    /**
+     * 获取首页摘要数据
+     * 
+     * @return 包含当前总人数、今日平均专注度、开放教室数量、违规占座预警
+     */
+    @GetMapping("/summary")
+    public Result<Map<String, Object>> getSummary(@RequestParam Long roomId) {
+        Map<String, Object> summary = new java.util.HashMap<>();
+
+        // 1. 当前教室总人数 (totalPeople)：查询指定 roomId 的最新一条记录
+        Integer totalPeople = visualStatsLogMapper.selectLatestPersonCount(roomId);
+        summary.put("totalPeople", totalPeople != null ? totalPeople : 0);
+
+        // 2. 今日平均专注度 (avgFocus)：计算指定 roomId 今日所有记录的平均值
+        Double avgFocus = visualStatsLogMapper.selectTodayAvgFocus(roomId);
+        summary.put("avgFocus", avgFocus != null ? Math.round(avgFocus * 100.0) / 100.0 : 0.0);
+
+        // 3. 开放教室数量 (activeClassrooms)：统计总行数
+        Long activeClassrooms = sysClassroomMapper.selectCount(null);
+        summary.put("activeClassrooms", activeClassrooms);
+
+        // 4. 违规占座预警 (warnings)：暂时返回固定值 0
+        summary.put("warnings", 0);
+
+        return Result.success(summary);
+    }
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\entity\SeatBooking.java ==========
+
+package com.smartcampus.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.io.Serializable;
+import java.util.Date;
+
+/**
+ * 座位预约实体类
+ */
+@Data
+@TableName("seat_booking")
+public class SeatBooking implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableId(value = "booking_id", type = IdType.AUTO)
+    private Long bookingId;
+
+    private Long userId;
+
+    private Long roomId;
+
+    private String seatNumber;
+
+    private Date startTime;
+
+    private Date endTime;
+
+    /**
+     * 状态：0-已预约, 1-使用中, 2-已签退, 3-违规
+     */
+    private Integer status;
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\entity\SysClassroom.java ==========
+
+package com.smartcampus.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.io.Serializable;
+
+/**
+ * 教室实体类
+ */
+@Data
+@TableName("sys_classroom")
+public class SysClassroom implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableId(value = "room_id", type = IdType.AUTO)
+    private Long roomId;
+
+    private String roomName;
+
+    private Integer capacity;
+
+    private String cameraUrl;
+
+    /**
+     * 是否启用：1-启用, 0-禁用
+     */
+    private Integer isActive;
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\entity\SysUser.java ==========
+
+package com.smartcampus.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.io.Serializable;
+
+/**
+ * 用户实体类
+ */
+@Data
+@TableName("sys_user")
+public class SysUser implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableId(value = "user_id", type = IdType.AUTO)
+    private Long userId;
+
+    private String username;
+
+    private String password;
+
+    private String realName;
+
+    /**
+     * 角色：0-管理员, 1-老师, 2-学生
+     */
+    private Integer role;
+
+    /**
+     * 信用分
+     */
+    private Integer creditScore;
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\entity\VisualStatsLog.java ==========
+
+package com.smartcampus.entity;
+
+import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableId;
+import com.baomidou.mybatisplus.annotation.TableName;
+import lombok.Data;
+
+import java.io.Serializable;
+import java.util.Date;
+
+/**
+ * 视觉数据日志实体类
+ */
+@Data
+@TableName("visual_stats_log")
+public class VisualStatsLog implements Serializable {
+
+    private static final long serialVersionUID = 1L;
+
+    @TableId(value = "log_id", type = IdType.AUTO)
+    private Long logId;
+
+    private Long roomId;
+
+    private Integer personCount;
+
+    private Integer phoneCount;
+
+    /**
+     * 专注度指数
+     */
+    private Double focusIndex;
+
+    private Date createTime;
+
+    /**
+     * 原始JSON数据
+     */
+    private String rawJson;
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\mapper\SeatBookingMapper.java ==========
+
+package com.smartcampus.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.smartcampus.entity.SeatBooking;
+import org.apache.ibatis.annotations.Mapper;
+
+/**
+ * 座位预约Mapper接口
+ */
+@Mapper
+public interface SeatBookingMapper extends BaseMapper<SeatBooking> {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\mapper\SysClassroomMapper.java ==========
+
+package com.smartcampus.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.smartcampus.entity.SysClassroom;
+import org.apache.ibatis.annotations.Mapper;
+
+/**
+ * 教室Mapper接口
+ */
+@Mapper
+public interface SysClassroomMapper extends BaseMapper<SysClassroom> {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\mapper\SysUserMapper.java ==========
+
+package com.smartcampus.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.smartcampus.entity.SysUser;
+import org.apache.ibatis.annotations.Mapper;
+
+/**
+ * 用户Mapper接口
+ */
+@Mapper
+public interface SysUserMapper extends BaseMapper<SysUser> {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\mapper\VisualStatsLogMapper.java ==========
+
+package com.smartcampus.mapper;
+
+import com.baomidou.mybatisplus.core.mapper.BaseMapper;
+import com.smartcampus.entity.VisualStatsLog;
+import org.apache.ibatis.annotations.Mapper;
+import org.apache.ibatis.annotations.Select;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 视觉数据日志Mapper接口
+ */
+@Mapper
+public interface VisualStatsLogMapper extends BaseMapper<VisualStatsLog> {
+
+    /**
+     * 查询最近24小时按小时分组的平均专注度
+     * 
+     * @return 包含 time_point 和 avg_focus 的结果列表
+     */
+    @Select("SELECT DATE_FORMAT(create_time, '%H:00') AS time_point, " +
+            "AVG(focus_index) AS avg_focus " +
+            "FROM visual_stats_log " +
+            "WHERE room_id = #{roomId} AND create_time >= NOW() - INTERVAL 24 HOUR " +
+            "GROUP BY DATE_FORMAT(create_time, '%H:00') " +
+            "ORDER BY time_point")
+    List<Map<String, Object>> selectTrendLast24Hours(Long roomId);
+
+    /**
+     * 获取最新的一条记录的人数
+     */
+    @Select("SELECT person_count FROM visual_stats_log WHERE room_id = #{roomId} ORDER BY create_time DESC LIMIT 1")
+    Integer selectLatestPersonCount(Long roomId);
+
+    /**
+     * 计算今日平均专注度 (create_time >= 当天0点)
+     */
+    @Select("SELECT AVG(focus_index) FROM visual_stats_log WHERE room_id = #{roomId} AND create_time >= CURDATE()")
+    Double selectTodayAvgFocus(Long roomId);
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\impl\SeatBookingServiceImpl.java ==========
+
+package com.smartcampus.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.smartcampus.entity.SeatBooking;
+import com.smartcampus.mapper.SeatBookingMapper;
+import com.smartcampus.service.SeatBookingService;
+import org.springframework.stereotype.Service;
+
+/**
+ * 座位预约Service实现类
+ */
+@Service
+public class SeatBookingServiceImpl extends ServiceImpl<SeatBookingMapper, SeatBooking> implements SeatBookingService {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\impl\SysClassroomServiceImpl.java ==========
+
+package com.smartcampus.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.smartcampus.entity.SysClassroom;
+import com.smartcampus.mapper.SysClassroomMapper;
+import com.smartcampus.service.SysClassroomService;
+import org.springframework.stereotype.Service;
+
+/**
+ * 教室Service实现类
+ */
+@Service
+public class SysClassroomServiceImpl extends ServiceImpl<SysClassroomMapper, SysClassroom> implements SysClassroomService {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\impl\SysUserServiceImpl.java ==========
+
+package com.smartcampus.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.smartcampus.entity.SysUser;
+import com.smartcampus.mapper.SysUserMapper;
+import com.smartcampus.service.SysUserService;
+import org.springframework.stereotype.Service;
+
+/**
+ * 用户Service实现类
+ */
+@Service
+public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> implements SysUserService {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\impl\VisualStatsLogServiceImpl.java ==========
+
+package com.smartcampus.service.impl;
+
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.smartcampus.entity.VisualStatsLog;
+import com.smartcampus.mapper.VisualStatsLogMapper;
+import com.smartcampus.service.VisualStatsLogService;
+import org.springframework.stereotype.Service;
+
+/**
+ * 视觉数据日志Service实现类
+ */
+@Service
+public class VisualStatsLogServiceImpl extends ServiceImpl<VisualStatsLogMapper, VisualStatsLog> implements VisualStatsLogService {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\SeatBookingService.java ==========
+
+package com.smartcampus.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.smartcampus.entity.SeatBooking;
+
+/**
+ * 座位预约Service接口
+ */
+public interface SeatBookingService extends IService<SeatBooking> {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\SysClassroomService.java ==========
+
+package com.smartcampus.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.smartcampus.entity.SysClassroom;
+
+/**
+ * 教室Service接口
+ */
+public interface SysClassroomService extends IService<SysClassroom> {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\SysUserService.java ==========
+
+package com.smartcampus.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.smartcampus.entity.SysUser;
+
+/**
+ * 用户Service接口
+ */
+public interface SysUserService extends IService<SysUser> {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\service\VisualStatsLogService.java ==========
+
+package com.smartcampus.service;
+
+import com.baomidou.mybatisplus.extension.service.IService;
+import com.smartcampus.entity.VisualStatsLog;
+
+/**
+ * 视觉数据日志Service接口
+ */
+public interface VisualStatsLogService extends IService<VisualStatsLog> {
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\java\com\smartcampus\SmartCampusApplication.java ==========
+
+package com.smartcampus;
+
+import com.smartcampus.entity.VisualStatsLog;
+import com.smartcampus.service.VisualStatsLogService;
+import org.mybatis.spring.annotation.MapperScan;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.context.annotation.Bean;
+
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.Random;
+
+/**
+ * 智学空间 - 启动类
+ */
+@SpringBootApplication
+@MapperScan("com.smartcampus.mapper")
+public class SmartCampusApplication {
+
+    public static void main(String[] args) {
+        SpringApplication.run(SmartCampusApplication.class, args);
+        System.out.println("======================================");
+        System.out.println("  智学空间后端服务启动成功!");
+        System.out.println("  端口: 8080");
+        System.out.println("======================================");
+    }
+
+    /**
+     * 启动时生成符合课表规律的模拟数据
+     */
+    @Bean
+    public CommandLineRunner dataInitializer(VisualStatsLogService visualStatsLogService,
+            com.smartcampus.service.SysClassroomService sysClassroomService) {
+        return args -> {
+            System.out.println("正在清空旧数据并生成新的模拟数据...");
+
+            // 1. 初始化教室数据 (101-105)
+            sysClassroomService.remove(null);
+            List<com.smartcampus.entity.SysClassroom> classroomList = new ArrayList<>();
+            for (long i = 101; i <= 105; i++) {
+                com.smartcampus.entity.SysClassroom classroom = new com.smartcampus.entity.SysClassroom();
+                classroom.setRoomId(i);
+                classroom.setRoomName(i + " 教室");
+                classroom.setCapacity(180);
+                classroom.setCameraUrl("mock://stream/" + i);
+                classroom.setIsActive(1);
+                classroomList.add(classroom);
+            }
+            sysClassroomService.saveBatch(classroomList);
+            System.out.println("教室数据初始化完成: 101-105");
+
+            // 2. 清空旧统计日志
+            visualStatsLogService.remove(null);
+
+            Random random = new Random();
+            List<VisualStatsLog> allLogs = new ArrayList<>();
+
+            // 3. 为每个教室生成过去24小时的模拟数据，每30分钟一条
+            for (long roomId = 101; roomId <= 105; roomId++) {
+                Calendar calendar = Calendar.getInstance();
+                for (int i = 47; i >= 0; i--) {
+                    calendar.setTime(new Date());
+                    calendar.add(Calendar.MINUTE, -i * 30);
+
+                    // 获取当前小时和分钟
+                    int hour = calendar.get(Calendar.HOUR_OF_DAY);
+                    int minute = calendar.get(Calendar.MINUTE);
+
+                    // 判断是否在上课时间
+                    boolean isClassTime = isInClassTime(hour, minute);
+
+                    VisualStatsLog log = new VisualStatsLog();
+                    log.setRoomId(roomId);
+
+                    int personCount;
+                    int phoneCount;
+
+                    if (isClassTime) {
+                        // 上课时间：80-160人 (接近180容量)
+                        personCount = 80 + random.nextInt(81);
+                        phoneCount = 2 + random.nextInt(10);
+                    } else {
+                        // 课间/休息：0-15人
+                        personCount = random.nextInt(16);
+                        phoneCount = personCount > 0 ? random.nextInt(Math.min(5, personCount + 1)) : 0;
+                    }
+
+                    log.setPersonCount(personCount);
+                    log.setPhoneCount(phoneCount);
+
+                    // 计算专注度指数
+                    double focusIndex = 0.0;
+                    if (personCount > 0) {
+                        focusIndex = (double) (personCount - phoneCount) / personCount;
+                    }
+                    log.setFocusIndex(Math.round(focusIndex * 100.0) / 100.0);
+                    log.setCreateTime(calendar.getTime());
+
+                    allLogs.add(log);
+                }
+            }
+
+            visualStatsLogService.saveBatch(allLogs);
+            System.out.println("模拟数据生成完成，共为 5 个教室生成 " + allLogs.size() + " 条记录");
+        };
+    }
+
+    /**
+     * 判断指定时间是否在上课时间段内
+     * 上午: 08:00 - 11:50
+     * 下午: 14:30 - 18:00
+     * 晚自习: 18:40 - 22:00
+     */
+    private boolean isInClassTime(int hour, int minute) {
+        int timeInMinutes = hour * 60 + minute;
+
+        // 上午 08:00 - 11:50
+        if (timeInMinutes >= 8 * 60 && timeInMinutes < 11 * 60 + 50) {
+            return true;
+        }
+
+        // 下午 14:30 - 18:00
+        if (timeInMinutes >= 14 * 60 + 30 && timeInMinutes < 18 * 60) {
+            return true;
+        }
+
+        // 晚自习 18:40 - 22:00
+        if (timeInMinutes >= 18 * 60 + 40 && timeInMinutes < 22 * 60) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\src\main\resources\application.yml ==========
+
+server:
+  port: 8080
+
+spring:
+  datasource:
+    type: com.alibaba.druid.pool.DruidDataSource
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/smart_campus?useUnicode=true&characterEncoding=utf-8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456
+    druid:
+      initial-size: 5
+      min-idle: 5
+      max-active: 20
+      max-wait: 60000
+
+mybatis-plus:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+  global-config:
+    db-config:
+      id-type: auto
+      logic-delete-field: deleted
+      logic-delete-value: 1
+      logic-not-delete-value: 0
+
+
+========== FILE: E:\LEAR-CODE\smart-campus-backend\pom.xml ==========
+
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-starter-parent</artifactId>
+        <version>2.7.18</version>
+        <relativePath/>
+    </parent>
+
+    <groupId>com.smartcampus</groupId>
+    <artifactId>smart-campus-backend</artifactId>
+    <version>1.0.0</version>
+    <packaging>jar</packaging>
+    <name>smart-campus-backend</name>
+    <description>智学空间 - Smart Campus Backend</description>
+
+    <properties>
+        <java.version>1.8</java.version>
+        <mybatis-plus.version>3.5.3.1</mybatis-plus.version>
+        <druid.version>1.2.16</druid.version>
+    </properties>
+
+    <dependencies>
+        <!-- Spring Boot Web -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-web</artifactId>
+        </dependency>
+
+        <!-- MySQL Connector -->
+        <dependency>
+            <groupId>com.mysql</groupId>
+            <artifactId>mysql-connector-j</artifactId>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- Lombok -->
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <optional>true</optional>
+        </dependency>
+
+        <!-- MyBatis-Plus -->
+        <dependency>
+            <groupId>com.baomidou</groupId>
+            <artifactId>mybatis-plus-boot-starter</artifactId>
+            <version>${mybatis-plus.version}</version>
+        </dependency>
+
+        <!-- Druid 数据库连接池 -->
+        <dependency>
+            <groupId>com.alibaba</groupId>
+            <artifactId>druid-spring-boot-starter</artifactId>
+            <version>${druid.version}</version>
+        </dependency>
+
+        <!-- Spring Boot Test -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <configuration>
+                    <excludes>
+                        <exclude>
+                            <groupId>org.projectlombok</groupId>
+                            <artifactId>lombok</artifactId>
+                        </exclude>
+                    </excludes>
+                </configuration>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\assets\base.css ==========
+
+/* color palette from <https://github.com/vuejs/theme> */
+:root {
+  --vt-c-white: #ffffff;
+  --vt-c-white-soft: #f8f8f8;
+  --vt-c-white-mute: #f2f2f2;
+
+  --vt-c-black: #181818;
+  --vt-c-black-soft: #222222;
+  --vt-c-black-mute: #282828;
+
+  --vt-c-indigo: #2c3e50;
+
+  --vt-c-divider-light-1: rgba(60, 60, 60, 0.29);
+  --vt-c-divider-light-2: rgba(60, 60, 60, 0.12);
+  --vt-c-divider-dark-1: rgba(84, 84, 84, 0.65);
+  --vt-c-divider-dark-2: rgba(84, 84, 84, 0.48);
+
+  --vt-c-text-light-1: var(--vt-c-indigo);
+  --vt-c-text-light-2: rgba(60, 60, 60, 0.66);
+  --vt-c-text-dark-1: var(--vt-c-white);
+  --vt-c-text-dark-2: rgba(235, 235, 235, 0.64);
+}
+
+/* semantic color variables for this project */
+:root {
+  --color-background: var(--vt-c-white);
+  --color-background-soft: var(--vt-c-white-soft);
+  --color-background-mute: var(--vt-c-white-mute);
+
+  --color-border: var(--vt-c-divider-light-2);
+  --color-border-hover: var(--vt-c-divider-light-1);
+
+  --color-heading: var(--vt-c-text-light-1);
+  --color-text: var(--vt-c-text-light-1);
+
+  --section-gap: 160px;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-background: var(--vt-c-black);
+    --color-background-soft: var(--vt-c-black-soft);
+    --color-background-mute: var(--vt-c-black-mute);
+
+    --color-border: var(--vt-c-divider-dark-2);
+    --color-border-hover: var(--vt-c-divider-dark-1);
+
+    --color-heading: var(--vt-c-text-dark-1);
+    --color-text: var(--vt-c-text-dark-2);
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  font-weight: normal;
+}
+
+body {
+  min-height: 100vh;
+  color: var(--color-text);
+  background: var(--color-background);
+  transition:
+    color 0.5s,
+    background-color 0.5s;
+  line-height: 1.6;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    'Segoe UI',
+    Roboto,
+    Oxygen,
+    Ubuntu,
+    Cantarell,
+    'Fira Sans',
+    'Droid Sans',
+    'Helvetica Neue',
+    sans-serif;
+  font-size: 15px;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\assets\main.css ==========
+
+@import './base.css';
+
+#app {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  font-weight: normal;
+}
+
+a,
+.green {
+  text-decoration: none;
+  color: hsla(160, 100%, 37%, 1);
+  transition: 0.4s;
+  padding: 3px;
+}
+
+@media (hover: hover) {
+  a:hover {
+    background-color: hsla(160, 100%, 37%, 0.2);
+  }
+}
+
+@media (min-width: 1024px) {
+  body {
+    display: flex;
+    place-items: center;
+  }
+
+  #app {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    padding: 0 2rem;
+  }
+}
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\icons\IconCommunity.vue ==========
+
+<template>
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor">
+    <path
+      d="M15 4a1 1 0 1 0 0 2V4zm0 11v-1a1 1 0 0 0-1 1h1zm0 4l-.707.707A1 1 0 0 0 16 19h-1zm-4-4l.707-.707A1 1 0 0 0 11 14v1zm-4.707-1.293a1 1 0 0 0-1.414 1.414l1.414-1.414zm-.707.707l-.707-.707.707.707zM9 11v-1a1 1 0 0 0-.707.293L9 11zm-4 0h1a1 1 0 0 0-1-1v1zm0 4H4a1 1 0 0 0 1.707.707L5 15zm10-9h2V4h-2v2zm2 0a1 1 0 0 1 1 1h2a3 3 0 0 0-3-3v2zm1 1v6h2V7h-2zm0 6a1 1 0 0 1-1 1v2a3 3 0 0 0 3-3h-2zm-1 1h-2v2h2v-2zm-3 1v4h2v-4h-2zm1.707 3.293l-4-4-1.414 1.414 4 4 1.414-1.414zM11 14H7v2h4v-2zm-4 0c-.276 0-.525-.111-.707-.293l-1.414 1.414C5.42 15.663 6.172 16 7 16v-2zm-.707 1.121l3.414-3.414-1.414-1.414-3.414 3.414 1.414 1.414zM9 12h4v-2H9v2zm4 0a3 3 0 0 0 3-3h-2a1 1 0 0 1-1 1v2zm3-3V3h-2v6h2zm0-6a3 3 0 0 0-3-3v2a1 1 0 0 1 1 1h2zm-3-3H3v2h10V0zM3 0a3 3 0 0 0-3 3h2a1 1 0 0 1 1-1V0zM0 3v6h2V3H0zm0 6a3 3 0 0 0 3 3v-2a1 1 0 0 1-1-1H0zm3 3h2v-2H3v2zm1-1v4h2v-4H4zm1.707 4.707l.586-.586-1.414-1.414-.586.586 1.414 1.414z"
+    />
+  </svg>
+</template>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\icons\IconDocumentation.vue ==========
+
+<template>
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="17" fill="currentColor">
+    <path
+      d="M11 2.253a1 1 0 1 0-2 0h2zm-2 13a1 1 0 1 0 2 0H9zm.447-12.167a1 1 0 1 0 1.107-1.666L9.447 3.086zM1 2.253L.447 1.42A1 1 0 0 0 0 2.253h1zm0 13H0a1 1 0 0 0 1.553.833L1 15.253zm8.447.833a1 1 0 1 0 1.107-1.666l-1.107 1.666zm0-14.666a1 1 0 1 0 1.107 1.666L9.447 1.42zM19 2.253h1a1 1 0 0 0-.447-.833L19 2.253zm0 13l-.553.833A1 1 0 0 0 20 15.253h-1zm-9.553-.833a1 1 0 1 0 1.107 1.666L9.447 14.42zM9 2.253v13h2v-13H9zm1.553-.833C9.203.523 7.42 0 5.5 0v2c1.572 0 2.961.431 3.947 1.086l1.107-1.666zM5.5 0C3.58 0 1.797.523.447 1.42l1.107 1.666C2.539 2.431 3.928 2 5.5 2V0zM0 2.253v13h2v-13H0zm1.553 13.833C2.539 15.431 3.928 15 5.5 15v-2c-1.92 0-3.703.523-5.053 1.42l1.107 1.666zM5.5 15c1.572 0 2.961.431 3.947 1.086l1.107-1.666C9.203 13.523 7.42 13 5.5 13v2zm5.053-11.914C11.539 2.431 12.928 2 14.5 2V0c-1.92 0-3.703.523-5.053 1.42l1.107 1.666zM14.5 2c1.573 0 2.961.431 3.947 1.086l1.107-1.666C18.203.523 16.421 0 14.5 0v2zm3.5.253v13h2v-13h-2zm1.553 12.167C18.203 13.523 16.421 13 14.5 13v2c1.573 0 2.961.431 3.947 1.086l1.107-1.666zM14.5 13c-1.92 0-3.703.523-5.053 1.42l1.107 1.666C11.539 15.431 12.928 15 14.5 15v-2z"
+    />
+  </svg>
+</template>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\icons\IconEcosystem.vue ==========
+
+<template>
+  <svg xmlns="http://www.w3.org/2000/svg" width="18" height="20" fill="currentColor">
+    <path
+      d="M11.447 8.894a1 1 0 1 0-.894-1.789l.894 1.789zm-2.894-.789a1 1 0 1 0 .894 1.789l-.894-1.789zm0 1.789a1 1 0 1 0 .894-1.789l-.894 1.789zM7.447 7.106a1 1 0 1 0-.894 1.789l.894-1.789zM10 9a1 1 0 1 0-2 0h2zm-2 2.5a1 1 0 1 0 2 0H8zm9.447-5.606a1 1 0 1 0-.894-1.789l.894 1.789zm-2.894-.789a1 1 0 1 0 .894 1.789l-.894-1.789zm2 .789a1 1 0 1 0 .894-1.789l-.894 1.789zm-1.106-2.789a1 1 0 1 0-.894 1.789l.894-1.789zM18 5a1 1 0 1 0-2 0h2zm-2 2.5a1 1 0 1 0 2 0h-2zm-5.447-4.606a1 1 0 1 0 .894-1.789l-.894 1.789zM9 1l.447-.894a1 1 0 0 0-.894 0L9 1zm-2.447.106a1 1 0 1 0 .894 1.789l-.894-1.789zm-6 3a1 1 0 1 0 .894 1.789L.553 4.106zm2.894.789a1 1 0 1 0-.894-1.789l.894 1.789zm-2-.789a1 1 0 1 0-.894 1.789l.894-1.789zm1.106 2.789a1 1 0 1 0 .894-1.789l-.894 1.789zM2 5a1 1 0 1 0-2 0h2zM0 7.5a1 1 0 1 0 2 0H0zm8.553 12.394a1 1 0 1 0 .894-1.789l-.894 1.789zm-1.106-2.789a1 1 0 1 0-.894 1.789l.894-1.789zm1.106 1a1 1 0 1 0 .894 1.789l-.894-1.789zm2.894.789a1 1 0 1 0-.894-1.789l.894 1.789zM8 19a1 1 0 1 0 2 0H8zm2-2.5a1 1 0 1 0-2 0h2zm-7.447.394a1 1 0 1 0 .894-1.789l-.894 1.789zM1 15H0a1 1 0 0 0 .553.894L1 15zm1-2.5a1 1 0 1 0-2 0h2zm12.553 2.606a1 1 0 1 0 .894 1.789l-.894-1.789zM17 15l.447.894A1 1 0 0 0 18 15h-1zm1-2.5a1 1 0 1 0-2 0h2zm-7.447-5.394l-2 1 .894 1.789 2-1-.894-1.789zm-1.106 1l-2-1-.894 1.789 2 1 .894-1.789zM8 9v2.5h2V9H8zm8.553-4.894l-2 1 .894 1.789 2-1-.894-1.789zm.894 0l-2-1-.894 1.789 2 1 .894-1.789zM16 5v2.5h2V5h-2zm-4.553-3.894l-2-1-.894 1.789 2 1 .894-1.789zm-2.894-1l-2 1 .894 1.789 2-1L8.553.106zM1.447 5.894l2-1-.894-1.789-2 1 .894 1.789zm-.894 0l2 1 .894-1.789-2-1-.894 1.789zM0 5v2.5h2V5H0zm9.447 13.106l-2-1-.894 1.789 2 1 .894-1.789zm0 1.789l2-1-.894-1.789-2 1 .894 1.789zM10 19v-2.5H8V19h2zm-6.553-3.894l-2-1-.894 1.789 2 1 .894-1.789zM2 15v-2.5H0V15h2zm13.447 1.894l2-1-.894-1.789-2 1 .894 1.789zM18 15v-2.5h-2V15h2z"
+    />
+  </svg>
+</template>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\icons\IconSupport.vue ==========
+
+<template>
+  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor">
+    <path
+      d="M10 3.22l-.61-.6a5.5 5.5 0 0 0-7.666.105 5.5 5.5 0 0 0-.114 7.665L10 18.78l8.39-8.4a5.5 5.5 0 0 0-.114-7.665 5.5 5.5 0 0 0-7.666-.105l-.61.61z"
+    />
+  </svg>
+</template>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\icons\IconTooling.vue ==========
+
+<!-- This icon is from <https://github.com/Templarian/MaterialDesign>, distributed under Apache 2.0 (https://www.apache.org/licenses/LICENSE-2.0) license-->
+<template>
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    aria-hidden="true"
+    role="img"
+    class="iconify iconify--mdi"
+    width="24"
+    height="24"
+    preserveAspectRatio="xMidYMid meet"
+    viewBox="0 0 24 24"
+  >
+    <path
+      d="M20 18v-4h-3v1h-2v-1H9v1H7v-1H4v4h16M6.33 8l-1.74 4H7v-1h2v1h6v-1h2v1h2.41l-1.74-4H6.33M9 5v1h6V5H9m12.84 7.61c.1.22.16.48.16.8V18c0 .53-.21 1-.6 1.41c-.4.4-.85.59-1.4.59H4c-.55 0-1-.19-1.4-.59C2.21 19 2 18.53 2 18v-4.59c0-.32.06-.58.16-.8L4.5 7.22C4.84 6.41 5.45 6 6.33 6H7V5c0-.55.18-1 .57-1.41C7.96 3.2 8.44 3 9 3h6c.56 0 1.04.2 1.43.59c.39.41.57.86.57 1.41v1h.67c.88 0 1.49.41 1.83 1.22l2.34 5.39z"
+      fill="currentColor"
+    ></path>
+  </svg>
+</template>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\FloatingSimulator.vue ==========
+
+<template>
+  <!-- 悬浮按钮 - 重新设计为胶囊形 -->
+  <div 
+    class="floating-btn-wrapper"
+    @click="dialogVisible = true"
+  >
+    <div class="floating-btn-content">
+      <el-icon class="btn-icon"><Setting /></el-icon>
+      <span class="btn-text">数据模拟</span>
+    </div>
+  </div>
+
+  <!-- 模拟器弹窗 -->
+  <el-dialog 
+    v-model="dialogVisible" 
+    title="🛠️ 设备数据模拟器" 
+    width="600px"
+    :close-on-click-modal="false"
+  >
+    <el-alert 
+      title="操作说明: 支持手动输入或自动生成数据，开启实时同步可随现实时间自动更新。" 
+      type="info" 
+      show-icon 
+      :closable="false" 
+      style="margin-bottom: 20px;" 
+    />
+
+    <el-form label-width="120px">
+      <el-form-item label="时间同步">
+        <el-switch
+          v-model="isLiveMode"
+          active-text="实时同步"
+          inactive-text="手动选择"
+          @change="handleSyncChange"
+        />
+      </el-form-item>
+
+      <el-form-item label="模拟时间">
+        <el-date-picker 
+          v-model="simulateTime" 
+          type="datetime" 
+          placeholder="选择日期时间"
+          style="width: 100%;"
+          format="YYYY-MM-DD HH:mm:ss"
+          @change="handleTimeManualChange"
+        />
+      </el-form-item>
+
+      <el-form-item label="教室 ID">
+        <el-input v-model="formData.roomId" placeholder="请输入教室ID" />
+      </el-form-item>
+      
+      <el-form-item label="识别总人数">
+        <el-input-number v-model="formData.personCount" :min="0" :max="180" style="width: 100%;" />
+      </el-form-item>
+
+      <el-form-item label="玩手机人数">
+        <el-input-number v-model="formData.phoneCount" :min="0" :max="formData.personCount" style="width: 100%;" />
+      </el-form-item>
+    </el-form>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="resetForm">重置</el-button>
+        <el-button type="success" plain @click="generateRealData">
+          🎲 智能生成
+        </el-button>
+        <el-button type="primary" @click="sendData" :loading="loading">
+          🚀 发送数据
+        </el-button>
+      </div>
+    </template>
+
+    <div v-if="responseText" class="log-box" :class="{ 'error-log': responseText.includes('❌') }">
+      <p>📋 系统反馈：</p>
+      <div class="log-content">{{ responseText }}</div>
+    </div>
+  </el-dialog>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
+import axios from 'axios'
+import { ElMessage } from 'element-plus'
+import { Setting } from '@element-plus/icons-vue'
+
+const dialogVisible = ref(false)
+const loading = ref(false)
+const responseText = ref('')
+const isLiveMode = ref(true) // 默认开启实时同步
+let timeUpdateInterval = null
+
+// 表单数据
+const simulateTime = ref(new Date())
+const formData = reactive({
+  roomId: 101,
+  personCount: 0,
+  phoneCount: 0
+})
+
+// 时间同步逻辑
+const handleSyncChange = (val) => {
+  if (val) {
+    simulateTime.value = new Date()
+  }
+}
+
+const handleTimeManualChange = () => {
+  isLiveMode.value = false // 手动选择时间时关闭实时同步
+}
+
+// 启动定时器实时更新
+onMounted(() => {
+  timeUpdateInterval = setInterval(() => {
+    // 只有在开启实时模式时才更新时间
+    if (isLiveMode.value) {
+      simulateTime.value = new Date()
+    }
+  }, 1000)
+})
+
+onUnmounted(() => {
+  if (timeUpdateInterval) {
+    clearInterval(timeUpdateInterval)
+  }
+})
+
+// 🎲 智能生成数据的逻辑 (根据模拟时间)
+const generateRealData = () => {
+  const hour = simulateTime.value.getHours()
+  let pCount = 0
+  let phCount = 0
+
+  // 判定是否为上课/自习高峰 (08:00-11:50, 14:30-18:00, 18:40-22:00)
+  const minute = simulateTime.value.getMinutes();
+  const timeInMinutes = hour * 60 + minute;
+  
+  const isPeak = (timeInMinutes >= 8 * 60 && timeInMinutes < 11 * 60 + 50) || 
+                 (timeInMinutes >= 14 * 60 + 30 && timeInMinutes < 18 * 60) || 
+                 (timeInMinutes >= 18 * 60 + 40 && timeInMinutes < 22 * 60);
+  
+  if (isPeak) {
+    // 峰值：80-165人 (对应 180 人容量)
+    pCount = Math.floor(Math.random() * (165 - 80 + 1)) + 80
+    phCount = Math.floor(Math.random() * 12) + 2
+  } else if (hour >= 23 || hour < 6) {
+    // 深夜：0-5人
+    pCount = Math.floor(Math.random() * 6)
+    phCount = 0
+  } else {
+    // 普通时段：10-40人
+    pCount = Math.floor(Math.random() * 31) + 10
+    phCount = Math.floor(Math.random() * (pCount * 0.2))
+  }
+
+  formData.personCount = pCount
+  formData.phoneCount = phCount
+  ElMessage.info(`已生成 ${hour}点 的模拟数据，可手动微调`)
+}
+
+// 🚀 发送数据的逻辑
+const sendData = async () => {
+  if (!formData.roomId) {
+    ElMessage.warning('请输入教室 ID')
+    return
+  }
+  
+  loading.value = true
+  try {
+    const res = await axios.post('http://127.0.0.1:8080/api/device/receive', null, {
+      params: {
+        roomId: formData.roomId,
+        personCount: formData.personCount,
+        phoneCount: formData.phoneCount
+      }
+    })
+    
+    if (res.data.code === 200) {
+      const timeStr = simulateTime.value.toLocaleString()
+      responseText.value = `[${timeStr}] ✅ 发送成功! 教室: ${formData.roomId} | 总人数: ${formData.personCount} | 玩手机: ${formData.phoneCount}`
+      ElMessage.success('数据已上传')
+      window.dispatchEvent(new CustomEvent('data-updated'))
+    } else {
+      responseText.value = "❌ 报错：" + res.data.msg
+    }
+  } catch (error) {
+    console.error(error)
+    responseText.value = "❌ 连接失败：请检查 Java 后端是否启动！"
+    ElMessage.error('连接失败')
+  } finally {
+    loading.value = false
+  }
+}
+
+const resetForm = () => {
+  isLiveMode.value = true
+  simulateTime.value = new Date()
+  formData.roomId = 101
+  formData.personCount = 0
+  formData.phoneCount = 0
+  responseText.value = ''
+}
+</script>
+
+<style scoped>
+/* 悬浮按钮包裹容器 - 胶囊设计 */
+.floating-btn-wrapper {
+  position: fixed;
+  bottom: 40px;
+  right: 40px;
+  height: 48px;
+  background: linear-gradient(135deg, #409EFF 0%, #3a8ee6 50%, #1f2d3d 100%);
+  border-radius: 24px;
+  padding: 0 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  cursor: pointer;
+  box-shadow: 0 4px 15px rgba(64, 158, 255, 0.4);
+  z-index: 2000;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  animation: breathing 3s infinite ease-in-out;
+  user-select: none;
+}
+
+.floating-btn-wrapper:hover {
+  transform: scale(1.05) translateY(-2px);
+  box-shadow: 0 8px 25px rgba(64, 158, 255, 0.5);
+  animation-play-state: paused;
+}
+
+.floating-btn-wrapper:active {
+  transform: scale(0.95);
+}
+
+.floating-btn-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-icon {
+  font-size: 20px;
+}
+
+.btn-text {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+
+/* 呼吸动画 */
+@keyframes breathing {
+  0% { box-shadow: 0 4px 15px rgba(64, 158, 255, 0.4); }
+  50% { box-shadow: 0 4px 25px rgba(64, 158, 255, 0.6); }
+  100% { box-shadow: 0 4px 15px rgba(64, 158, 255, 0.4); }
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.log-box {
+  margin-top: 20px;
+  padding: 15px;
+  background: #f0f9eb;
+  border-radius: 8px;
+  border-left: 4px solid #67C23A;
+  color: #67C23A;
+  font-family: 'Consolas', monospace;
+  transition: all 0.3s;
+}
+
+.error-log {
+  background: #fef0f0;
+  border-left-color: #f56c6c;
+  color: #f56c6c;
+}
+
+.log-content {
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 500;
+}
+</style>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\FocusTrendChart.vue ==========
+
+<template>
+  <div ref="chartRef" style="width: 100%; height: 350px;"></div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+import * as echarts from 'echarts'
+import axios from 'axios'
+
+const chartRef = ref(null)
+let chartInstance = null
+
+// 封装获取数据的逻辑
+const fetchData = async (roomId) => {
+  if (!chartInstance) return
+  if (!roomId) {
+    console.warn('fetchData: roomId is missing')
+    return
+  }
+
+  try {
+    const response = await axios.get('http://127.0.0.1:8080/api/stats/trend', {
+      params: { roomId: roomId }
+    })
+    
+    if (response.data.code === 200 && response.data.data) {
+      const trendData = response.data.data
+      
+      // 提取时间点和专注度数据
+      const timePoints = trendData.map(item => item.time_point)
+      const focusValues = trendData.map(item => item.avg_focus)
+      
+      // 更新图表数据
+      chartInstance.setOption({
+        xAxis: {
+          data: timePoints
+        },
+        series: [
+          {
+            data: focusValues
+          }
+        ]
+      })
+    } else {
+      // 数据为空时的处理 (清空图表)
+      chartInstance.setOption({
+        xAxis: { data: [] },
+        series: [{ data: [] }]
+      })
+      console.log('暂无趋势数据')
+    }
+  } catch (error) {
+    // 网络错误处理
+    console.error('获取趋势数据失败:', error)
+  }
+}
+
+onMounted(async () => {
+  if (chartRef.value) {
+    // 初始化 ECharts 实例
+    chartInstance = echarts.init(chartRef.value)
+
+    // 初始化基础配置
+    const option = {
+      title: {
+        text: '专注度趋势',
+        left: 'center',
+        textStyle: {
+          fontSize: 16,
+          fontWeight: 'normal'
+        }
+      },
+      tooltip: {
+        trigger: 'axis',
+        formatter: '{b}<br/>专注度: {c}'
+      },
+      grid: {
+        left: '5%',
+        right: '5%',
+        bottom: '10%',
+        top: '15%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        boundaryGap: false,
+        data: [],
+        axisLine: {
+          lineStyle: {
+            color: '#999'
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        min: 0,
+        max: 1,
+        axisLabel: {
+          formatter: '{value}'
+        },
+        axisLine: {
+          lineStyle: {
+            color: '#999'
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            type: 'dashed'
+          }
+        }
+      },
+      series: [
+        {
+          name: '专注度',
+          type: 'line',
+          smooth: true,
+          data: [],
+          itemStyle: {
+            color: '#409EFF'
+          },
+          lineStyle: {
+            width: 2,
+            color: '#409EFF'
+          },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [
+                {
+                  offset: 0,
+                  color: 'rgba(64, 158, 255, 0.3)'
+                },
+                {
+                  offset: 1,
+                  color: 'rgba(64, 158, 255, 0.05)'
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+
+    // 先设置初始配置
+    chartInstance.setOption(option)
+
+    // 调用获取数据的函数 (默认加载 101 教室)
+    await fetchData(101)
+
+    // 监听窗口大小变化
+    window.addEventListener('resize', handleResize)
+  }
+})
+
+const handleResize = () => {
+  if (chartInstance) {
+    chartInstance.resize()
+  }
+}
+
+onUnmounted(() => {
+  // 清理资源
+  if (chartInstance) {
+    window.removeEventListener('resize', handleResize)
+    chartInstance.dispose()
+    chartInstance = null
+  }
+})
+
+// 暴露 fetchData 方法给父组件调用
+defineExpose({
+  fetchData
+})
+</script>
+
+<style scoped>
+/* 可以添加额外样式 */
+</style>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\HelloWorld.vue ==========
+
+<script setup>
+defineProps({
+  msg: {
+    type: String,
+    required: true,
+  },
+})
+</script>
+
+<template>
+  <div class="greetings">
+    <h1 class="green">{{ msg }}</h1>
+    <h3>
+      You’ve successfully created a project with
+      <a href="https://vite.dev/" target="_blank" rel="noopener">Vite</a> +
+      <a href="https://vuejs.org/" target="_blank" rel="noopener">Vue 3</a>.
+    </h3>
+  </div>
+</template>
+
+<style scoped>
+h1 {
+  font-weight: 500;
+  font-size: 2.6rem;
+  position: relative;
+  top: -10px;
+}
+
+h3 {
+  font-size: 1.2rem;
+}
+
+.greetings h1,
+.greetings h3 {
+  text-align: center;
+}
+
+@media (min-width: 1024px) {
+  .greetings h1,
+  .greetings h3 {
+    text-align: left;
+  }
+}
+</style>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\TheWelcome.vue ==========
+
+<script setup>
+import WelcomeItem from './WelcomeItem.vue'
+import DocumentationIcon from './icons/IconDocumentation.vue'
+import ToolingIcon from './icons/IconTooling.vue'
+import EcosystemIcon from './icons/IconEcosystem.vue'
+import CommunityIcon from './icons/IconCommunity.vue'
+import SupportIcon from './icons/IconSupport.vue'
+
+const openReadmeInEditor = () => fetch('/__open-in-editor?file=README.md')
+</script>
+
+<template>
+  <WelcomeItem>
+    <template #icon>
+      <DocumentationIcon />
+    </template>
+    <template #heading>Documentation</template>
+
+    Vue’s
+    <a href="https://vuejs.org/" target="_blank" rel="noopener">official documentation</a>
+    provides you with all information you need to get started.
+  </WelcomeItem>
+
+  <WelcomeItem>
+    <template #icon>
+      <ToolingIcon />
+    </template>
+    <template #heading>Tooling</template>
+
+    This project is served and bundled with
+    <a href="https://vite.dev/guide/features.html" target="_blank" rel="noopener">Vite</a>. The
+    recommended IDE setup is
+    <a href="https://code.visualstudio.com/" target="_blank" rel="noopener">VSCode</a>
+    +
+    <a href="https://github.com/vuejs/language-tools" target="_blank" rel="noopener"
+      >Vue - Official</a
+    >. If you need to test your components and web pages, check out
+    <a href="https://vitest.dev/" target="_blank" rel="noopener">Vitest</a>
+    and
+    <a href="https://www.cypress.io/" target="_blank" rel="noopener">Cypress</a>
+    /
+    <a href="https://playwright.dev/" target="_blank" rel="noopener">Playwright</a>.
+
+    <br />
+
+    More instructions are available in
+    <a href="javascript:void(0)" @click="openReadmeInEditor"><code>README.md</code></a
+    >.
+  </WelcomeItem>
+
+  <WelcomeItem>
+    <template #icon>
+      <EcosystemIcon />
+    </template>
+    <template #heading>Ecosystem</template>
+
+    Get official tools and libraries for your project:
+    <a href="https://pinia.vuejs.org/" target="_blank" rel="noopener">Pinia</a>,
+    <a href="https://router.vuejs.org/" target="_blank" rel="noopener">Vue Router</a>,
+    <a href="https://test-utils.vuejs.org/" target="_blank" rel="noopener">Vue Test Utils</a>, and
+    <a href="https://github.com/vuejs/devtools" target="_blank" rel="noopener">Vue Dev Tools</a>. If
+    you need more resources, we suggest paying
+    <a href="https://github.com/vuejs/awesome-vue" target="_blank" rel="noopener">Awesome Vue</a>
+    a visit.
+  </WelcomeItem>
+
+  <WelcomeItem>
+    <template #icon>
+      <CommunityIcon />
+    </template>
+    <template #heading>Community</template>
+
+    Got stuck? Ask your question on
+    <a href="https://chat.vuejs.org" target="_blank" rel="noopener">Vue Land</a>
+    (our official Discord server), or
+    <a href="https://stackoverflow.com/questions/tagged/vue.js" target="_blank" rel="noopener"
+      >StackOverflow</a
+    >. You should also follow the official
+    <a href="https://bsky.app/profile/vuejs.org" target="_blank" rel="noopener">@vuejs.org</a>
+    Bluesky account or the
+    <a href="https://x.com/vuejs" target="_blank" rel="noopener">@vuejs</a>
+    X account for latest news in the Vue world.
+  </WelcomeItem>
+
+  <WelcomeItem>
+    <template #icon>
+      <SupportIcon />
+    </template>
+    <template #heading>Support Vue</template>
+
+    As an independent project, Vue relies on community backing for its sustainability. You can help
+    us by
+    <a href="https://vuejs.org/sponsor/" target="_blank" rel="noopener">becoming a sponsor</a>.
+  </WelcomeItem>
+</template>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\components\WelcomeItem.vue ==========
+
+<template>
+  <div class="item">
+    <i>
+      <slot name="icon"></slot>
+    </i>
+    <div class="details">
+      <h3>
+        <slot name="heading"></slot>
+      </h3>
+      <slot></slot>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.item {
+  margin-top: 2rem;
+  display: flex;
+  position: relative;
+}
+
+.details {
+  flex: 1;
+  margin-left: 1rem;
+}
+
+i {
+  display: flex;
+  place-items: center;
+  place-content: center;
+  width: 32px;
+  height: 32px;
+
+  color: var(--color-text);
+}
+
+h3 {
+  font-size: 1.2rem;
+  font-weight: 500;
+  margin-bottom: 0.4rem;
+  color: var(--color-heading);
+}
+
+@media (min-width: 1024px) {
+  .item {
+    margin-top: 0;
+    padding: 0.4rem 0 1rem calc(var(--section-gap) / 2);
+  }
+
+  i {
+    top: calc(50% - 25px);
+    left: -26px;
+    position: absolute;
+    border: 1px solid var(--color-border);
+    background: var(--color-background);
+    border-radius: 8px;
+    width: 50px;
+    height: 50px;
+  }
+
+  .item:before {
+    content: ' ';
+    border-left: 1px solid var(--color-border);
+    position: absolute;
+    left: 0;
+    bottom: calc(50% + 25px);
+    height: calc(50% - 25px);
+  }
+
+  .item:after {
+    content: ' ';
+    border-left: 1px solid var(--color-border);
+    position: absolute;
+    left: 0;
+    top: calc(50% + 25px);
+    height: calc(50% - 25px);
+  }
+
+  .item:first-of-type:before {
+    display: none;
+  }
+
+  .item:last-of-type:after {
+    display: none;
+  }
+}
+</style>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\router\index.js ==========
+
+import { createRouter, createWebHistory } from 'vue-router'
+
+const router = createRouter({
+  history: createWebHistory(import.meta.env.BASE_URL),
+  routes: [
+    {
+      path: '/',
+      name: 'map',
+      component: () => import('../views/MapView.vue'),
+      meta: { title: '校园空间导航' }
+    },
+    {
+      path: '/dashboard',
+      name: 'dashboard',
+      component: () => import('../views/DashboardView.vue'),
+      meta: { title: '教室状态实时看板' }
+    }
+  ]
+})
+
+export default router
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\views\DashboardView.vue ==========
+
+<template>
+  <div class="dashboard-view">
+    <div class="page-header">
+      <div class="header-left">
+        <h2>🏫 教室状态实时看板 (Classroom Monitor)</h2>
+        <div class="room-selector">
+          <span class="label">当前监控教室:</span>
+          <el-select v-model="selectedRoomId" placeholder="选择教室" style="width: 100px" @change="handleRoomChange">
+            <el-option
+              v-for="item in roomOptions"
+              :key="item.value"
+              :label="item.label"
+              :value="item.value"
+            />
+          </el-select>
+        </div>
+      </div>
+      <div class="header-right-actions">
+        <el-button type="warning" plain size="small" @click="handleReset">重置数据</el-button>
+        <el-button size="small" circle :icon="Refresh" @click="refreshData" />
+      </div>
+    </div>
+
+    <el-row :gutter="20" class="stat-cards">
+      <el-col :span="6">
+        <el-card shadow="hover" class="data-card">
+          <div class="stat-title">当前教室总人数</div>
+          <div class="stat-value text-blue">{{ statsData.totalPeople }}</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="data-card">
+          <div class="stat-title">今日平均专注度</div>
+          <div class="stat-value text-green">{{ statsData.avgFocus }}%</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="data-card">
+          <div class="stat-title">违规占座预警</div>
+          <div class="stat-value text-red">{{ statsData.warningCount }}</div>
+        </el-card>
+      </el-col>
+      <el-col :span="6">
+        <el-card shadow="hover" class="data-card">
+          <div class="stat-title">开放教室数量</div>
+          <div class="stat-value text-purple">{{ statsData.activeClassrooms }}</div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <el-card class="chart-card">
+      <template #header>
+        <div class="card-header">
+          <span>📈 24小时专注度趋势监控</span>
+          <el-button size="small" circle :icon="Refresh" @click="refreshChart" />
+        </div>
+      </template>
+      <FocusTrendChart ref="chartRef" />
+    </el-card>
+
+    <!-- 辅助入口：YOLO AI 视觉识别子系统 -->
+    <div class="ai-vision-launcher" @click="openYoloSystem">
+      <el-tooltip content="点击进入 AI 视觉识别子系统" placement="left">
+        <div class="launcher-ball">
+          <el-icon :size="24"><VideoCamera /></el-icon>
+          <span class="label">AI 视觉</span>
+        </div>
+      </el-tooltip>
+    </div>
+
+    <!-- 局部模拟器：仅在看板页面显示 -->
+    <FloatingSimulator />
+
+    <!-- AI 视觉识别子系统弹窗 (窗口化集成) -->
+    <el-dialog
+      v-model="yoloVisible"
+      title="🤖 AI 视觉识别子系统 (实时监控)"
+      width="90%"
+      destroy-on-close
+      draggable
+      class="yolo-dialog"
+      top="5vh"
+    >
+      <div class="iframe-container">
+        <iframe 
+          src="http://localhost:5000" 
+          frameborder="0" 
+          class="yolo-iframe"
+          allow="autoplay; camera"
+        ></iframe>
+      </div>
+    </el-dialog>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Refresh, VideoCamera } from '@element-plus/icons-vue'
+import axios from 'axios'
+import FocusTrendChart from '../components/FocusTrendChart.vue'
+import FloatingSimulator from '../components/FloatingSimulator.vue'
+
+const chartRef = ref(null)
+const selectedRoomId = ref(101)
+const yoloVisible = ref(false)
+const roomOptions = [
+  { value: 101, label: '101' },
+  { value: 102, label: '102' },
+  { value: 103, label: '103' },
+  { value: 104, label: '104' },
+  { value: 105, label: '105' }
+]
+
+// 响应式统计数据
+const statsData = reactive({
+  totalPeople: 0,
+  avgFocus: '--',
+  warningCount: 0,
+  activeClassrooms: 0
+})
+
+// 获取统计摘要
+const fetchSummary = async () => {
+  const roomId = selectedRoomId.value
+  console.log(`[Dashboard] 开始获取教室 ${roomId} 的统计数据...`)
+  try {
+    const response = await axios.get('http://127.0.0.1:8080/api/stats/summary', {
+      params: { roomId: roomId }
+    })
+    
+    if (response.data.code === 200) {
+      const data = response.data.data
+      console.log(`[Dashboard] 收到数据:`, data)
+      
+      // 1. 更新总人数 (处理 0 的情况)
+      statsData.totalPeople = (data.totalPeople !== null && data.totalPeople !== undefined) ? data.totalPeople : 0
+      
+      // 2. 更新专注度 (转换为百分比，保留两位小数)
+      if (data.avgFocus !== null && data.avgFocus !== undefined) {
+        // 后端返回的是 0-1 之间的小数，需要乘以 100
+        statsData.avgFocus = (parseFloat(data.avgFocus) * 100).toFixed(2)
+      } else {
+        statsData.avgFocus = '0.00'
+      }
+      
+      // 3. 更新其他统计项
+      statsData.warningCount = data.warnings !== null ? data.warnings : 0
+      statsData.activeClassrooms = data.activeClassrooms !== null ? data.activeClassrooms : 0
+    } else {
+      console.error('[Dashboard] 接口返回错误:', response.data.msg)
+    }
+  } catch (error) {
+    console.error('[Dashboard] 请求失败:', error)
+    ElMessage.error('无法同步最新数据，请检查网络或后端状态')
+  }
+}
+
+// 刷新图表
+const refreshChart = () => {
+  if (chartRef.value) {
+    chartRef.value.fetchData(selectedRoomId.value)
+  }
+  fetchSummary()
+}
+
+// 刷新所有数据 (包装函数)
+const refreshData = () => {
+  console.log(`🔔 [Event] 监听到数据更新事件，正在刷新教室 ${selectedRoomId.value} 的看板...`)
+  fetchSummary()
+  if (chartRef.value) {
+    chartRef.value.fetchData(selectedRoomId.value)
+  }
+}
+
+
+// 重置数据
+const handleReset = async () => {
+  const roomId = selectedRoomId.value
+  console.log(`[Dashboard] 正在重置教室 ${roomId} 的数据...`)
+  try {
+    // 调用后端重置接口
+    const response = await axios.post(`http://127.0.0.1:8080/api/stats/reset?roomId=${roomId}`)
+    
+    if (response.data.code === 200) {
+      ElMessage.success(`教室 ${roomId} 数据已成功重置为固定基准状态`)
+      // 触发全量刷新
+      refreshData()
+    } else {
+      ElMessage.error(response.data.msg || '重置失败')
+    }
+  } catch (error) {
+    console.error('[Dashboard] 重置请求失败:', error)
+    ElMessage.error('重置失败，请检查后端服务状态')
+  }
+}
+
+// 打开 YOLO 视觉识别系统 (切换为弹窗模式)
+const openYoloSystem = () => {
+  yoloVisible.value = true
+}
+
+// 切换教室
+const handleRoomChange = (value) => {
+  console.log(`🔄 [Action] 切换至教室: ${value}`)
+  refreshData()
+}
+
+onMounted(() => {
+  fetchSummary()
+  // 👂 添加监听器：一旦模拟器发送了数据，这里就会自动刷新
+  window.addEventListener('data-updated', refreshData)
+})
+
+onUnmounted(() => {
+  // 🗑️ 组件销毁时移除监听，防止内存泄漏
+  window.removeEventListener('data-updated', refreshData)
+})
+</script>
+
+<style scoped>
+.dashboard-view {
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.page-header h2 {
+  margin: 0;
+  color: #2b3a42;
+  font-size: 24px;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.header-right-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.room-selector {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.room-selector .label {
+  font-size: 14px;
+  color: #606266;
+}
+
+/* 统计卡片样式 */
+.stat-cards {
+  margin-bottom: 20px;
+}
+
+.data-card {
+  text-align: center;
+  transition: all 0.3s;
+  cursor: pointer;
+}
+
+.data-card:hover {
+  transform: translateY(-5px);
+}
+
+.stat-title {
+  color: #909399;
+  font-size: 14px;
+  margin-bottom: 10px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+}
+
+.text-blue { color: #409EFF; }
+.text-green { color: #67C23A; }
+.text-red { color: #F56C6C; }
+.text-purple { color: #9a65fd; }
+
+/* 图表卡片 */
+.chart-card {
+  margin-top: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* AI 视觉识别悬浮入口 */
+.ai-vision-launcher {
+  position: fixed;
+  right: 40px;
+  bottom: 120px; /* 位于模拟器上方 */
+  z-index: 2000;
+  cursor: pointer;
+}
+
+.launcher-ball {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #1f2d3d 0%, #3a4b5c 100%);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(64, 158, 255, 0.5);
+  transition: all 0.3s;
+  animation: ai-pulse 2s infinite;
+}
+
+.launcher-ball:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.5);
+  border-color: #409EFF;
+}
+
+.launcher-ball .label {
+  font-size: 10px;
+  margin-top: 2px;
+  font-weight: bold;
+}
+
+@keyframes ai-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(64, 158, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0); }
+}
+
+</style>
+
+<style>
+/* 全局样式：穿透 el-dialog 挂载在 body 下的限制 */
+.yolo-dialog .el-dialog__body {
+  padding: 0 !important;
+  height: 85vh !important;
+}
+
+.yolo-dialog .iframe-container {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.yolo-dialog .yolo-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+</style>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\views\MapView.vue ==========
+
+<template>
+  <div class="map-view-container">
+    <div class="map-wrapper">
+      <!-- 强化背景：使用模糊的背景填充边缘空洞 -->
+      <div class="map-background-blur" :style="{ backgroundImage: `url(${mapUrl})` }"></div>
+      
+      <!-- 校园地图主体 -->
+      <div class="map-content">
+        <img :src="mapUrl" alt="Campus Map" class="campus-map-img" />
+
+        <!-- 空间节点 -->
+        <div 
+          v-for="node in spatialNodes" 
+          :key="node.id"
+          class="spatial-node"
+          :style="{ left: node.x + '%', top: node.y + '%' }"
+        >
+          <el-tooltip
+            effect="dark"
+            :content="node.description"
+            placement="top"
+          >
+            <div class="node-marker" @click="navigateTo(node.path)">
+              <div class="marker-dot"></div>
+              <div class="marker-label">{{ node.name }}</div>
+            </div>
+          </el-tooltip>
+        </div>
+      </div>
+    </div>
+
+    <!-- 顶栏叠加层 - 调整位置避免重叠 -->
+    <div class="map-overlay-header">
+      <div class="header-glass-card">
+        <h3>🏛️ 校园空间概览</h3>
+        <p>点击地图节点进入对应管理模块</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref } from 'vue'
+import { useRouter } from 'vue-router'
+import mapUrl from '../assets/Map.jpg'
+
+const router = useRouter()
+
+/**
+ * 空间节点坐标修正说明 (基于用户标记图):
+ * 1. 学生公寓 (蓝色椭圆): x: 34.0, y: 26.5
+ * 2. 校园食堂 (蓝色椭圆下绿色矩形): x: 34.0, y: 43.5
+ * 3. 田径体育场 (左侧绿色矩形): x: 14.5, y: 58.5
+ * 4. 校图书馆 (中间红色矩形): x: 60.5, y: 43.5
+ * 5. 1号教学楼 (红色矩形旁蓝色矩形): x: 69.5, y: 43.5
+ */
+const spatialNodes = ref([
+  {
+    id: 1,
+    name: '1号教学楼',
+    description: '查看实时教室占用与学生专注度看板',
+    x: 69.5,
+    y: 43.5,
+    path: '/dashboard'
+  },
+  {
+    id: 2,
+    name: '校图书馆',
+    description: '在馆人数监控与自习位预约',
+    x: 60.5,
+    y: 43.5,
+    path: '#'
+  },
+  {
+    id: 3,
+    name: '田径体育场',
+    description: '体育设施监控 (暂未开放)',
+    x: 14.5,
+    y: 58.5,
+    path: '#'
+  },
+  {
+    id: 4,
+    name: '学生公寓',
+    description: '宿舍安全与用电监测',
+    x: 34.0,
+    y: 26.5,
+    path: '#'
+  },
+  {
+    id: 5,
+    name: '校园食堂',
+    description: '今日菜谱与餐厅拥挤度监控',
+    x: 34.0,
+    y: 43.5,
+    path: '#'
+  }
+])
+
+const navigateTo = (path) => {
+  if (path && path !== '#') {
+    router.push(path)
+  }
+}
+</script>
+
+<style scoped>
+.map-view-container {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  background-color: #1a1a1a;
+  overflow: hidden;
+}
+
+.map-wrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 背景模糊填充，防止两侧空洞 */
+.map-background-blur {
+  position: absolute;
+  top: -10%;
+  left: -10%;
+  width: 120%;
+  height: 120%;
+  background-size: cover;
+  background-position: center;
+  filter: blur(40px) brightness(0.4);
+  z-index: 1;
+}
+
+.map-content {
+  position: relative;
+  z-index: 2;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.campus-map-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  box-shadow: 0 0 50px rgba(0,0,0,0.5);
+  border-radius: 4px;
+}
+
+/* 空间节点样式 */
+.spatial-node {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+  z-index: 10;
+}
+
+.node-marker {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.marker-dot {
+  width: 14px;
+  height: 14px;
+  background-color: #409EFF;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(64, 158, 255, 0.8);
+  animation: pulse 2s infinite;
+}
+
+.marker-label {
+  margin-top: 6px;
+  padding: 4px 10px;
+  background-color: rgba(26, 26, 26, 0.8);
+  color: #fff;
+  font-size: 12px;
+  border-radius: 4px;
+  backdrop-filter: blur(4px);
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+
+.node-marker:hover {
+  transform: scale(1.15);
+}
+
+.node-marker:hover .marker-dot {
+  background-color: #67C23A;
+  box-shadow: 0 0 15px rgba(103, 194, 58, 0.8);
+}
+
+/* 呼吸动画 */
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(64, 158, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(64, 158, 255, 0); }
+}
+
+/* 叠加页头样式 */
+.map-overlay-header {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 20;
+}
+
+.header-glass-card {
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(10px);
+  padding: 16px 20px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.map-overlay-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.map-overlay-header p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: #7f8c8d;
+}
+</style>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\App.vue ==========
+
+<template>
+  <el-container class="app-wrapper">
+    <!-- Sidebar -->
+    <el-aside width="240px" class="sidebar-container">
+      <div class="logo-container">
+        <span class="logo-icon">🎓</span>
+        <span class="logo-text">智学空间</span>
+      </div>
+      
+      <el-menu
+        default-active="/"
+        class="sidebar-menu"
+        background-color="#1f2d3d"
+        text-color="#bfcbd9"
+        active-text-color="#409EFF"
+        router
+      >
+        <el-menu-item index="/">
+          <el-icon><Location /></el-icon>
+          <span>校园空间导航</span>
+        </el-menu-item>
+
+        <el-menu-item index="/dashboard">
+          <el-icon><Monitor /></el-icon>
+          <span>教室状态监控</span>
+        </el-menu-item>
+        
+        <el-menu-item index="/reservation" disabled>
+          <el-icon><Calendar /></el-icon>
+          <span>座位预约</span>
+        </el-menu-item>
+        
+        <el-menu-item index="/analysis" disabled>
+          <el-icon><PieChart /></el-icon>
+          <span>数据分析</span>
+        </el-menu-item>
+      </el-menu>
+    </el-aside>
+
+    <el-container class="main-container">
+      <!-- Header -->
+      <el-header class="app-header">
+        <div class="header-left">
+          <span class="page-title">智慧校园治理平台</span>
+        </div>
+        <div class="header-right">
+          <el-tag effect="dark" type="success">系统运行中</el-tag>
+        </div>
+      </el-header>
+
+      <!-- Main Content -->
+      <el-main class="app-main">
+        <router-view v-slot="{ Component }">
+          <transition name="fade-transform" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
+      </el-main>
+    </el-container>
+
+  </el-container>
+</template>
+
+<script setup>
+import { Monitor, Calendar, PieChart, Location } from '@element-plus/icons-vue'
+</script>
+
+<style>
+/* Global Reset */
+body {
+  margin: 0;
+  padding: 0;
+  height: 100vh;
+  overflow: hidden;
+  font-family: 'Helvetica Neue', Helvetica, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', Arial, sans-serif;
+}
+
+#app {
+  height: 100%;
+}
+
+.app-wrapper {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Sidebar Styling */
+.sidebar-container {
+  background-color: #1f2d3d;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s;
+  box-shadow: 2px 0 6px rgba(0, 21, 41, 0.35);
+  z-index: 1001;
+}
+
+.logo-container {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  padding: 0 20px;
+  background-color: #2b3a42;
+  overflow: hidden;
+}
+
+.logo-icon {
+  font-size: 24px;
+  margin-right: 12px;
+}
+
+.logo-text {
+  font-size: 18px;
+  font-weight: bold;
+  white-space: nowrap;
+  color: #fff;
+}
+
+.sidebar-menu {
+  border-right: none;
+  flex: 1;
+}
+
+/* Main Container Styling */
+.main-container {
+  flex-direction: column;
+  background-color: #f0f2f5;
+  height: 100vh;
+}
+
+.app-header {
+  background-color: #fff;
+  height: 60px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 24px;
+  box-shadow: 0 1px 4px rgba(0,21,41,.08);
+  z-index: 1000;
+}
+
+.header-left .page-title {
+  font-size: 16px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.app-main {
+  padding: 24px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: calc(100vh - 60px);
+}
+
+/* Transitions */
+.fade-transform-enter-active,
+.fade-transform-leave-active {
+  transition: all .3s;
+}
+
+.fade-transform-enter-from {
+  opacity: 0;
+  transform: translateX(-30px);
+}
+
+.fade-transform-leave-to {
+  opacity: 0;
+  transform: translateX(30px);
+}
+</style>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\src\main.js ==========
+
+import { createApp } from 'vue'
+import App from './App.vue'
+import router from './router'
+
+// 1. 引入 Element Plus
+import ElementPlus from 'element-plus'
+// 2. 引入它的样式文件（必须引，不然没有颜色）
+import 'element-plus/dist/index.css'
+
+const app = createApp(App)
+
+// 3. 注册使用
+app.use(ElementPlus)
+app.use(router)
+app.mount('#app')
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\index.html ==========
+
+<!DOCTYPE html>
+<html lang="">
+  <head>
+    <meta charset="UTF-8">
+    <link rel="icon" href="/favicon.ico">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vite App</title>
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\README.md ==========
+
+# vue-demo
+
+This template should help get you started developing with Vue 3 in Vite.
+
+## Recommended IDE Setup
+
+[VS Code](https://code.visualstudio.com/) + [Vue (Official)](https://marketplace.visualstudio.com/items?itemName=Vue.volar) (and disable Vetur).
+
+## Recommended Browser Setup
+
+- Chromium-based browsers (Chrome, Edge, Brave, etc.):
+  - [Vue.js devtools](https://chromewebstore.google.com/detail/vuejs-devtools/nhdogjmejiglipccpnnnanhbledajbpd)
+  - [Turn on Custom Object Formatter in Chrome DevTools](http://bit.ly/object-formatters)
+- Firefox:
+  - [Vue.js devtools](https://addons.mozilla.org/en-US/firefox/addon/vue-js-devtools/)
+  - [Turn on Custom Object Formatter in Firefox DevTools](https://fxdx.dev/firefox-devtools-custom-object-formatters/)
+
+## Customize configuration
+
+See [Vite Configuration Reference](https://vite.dev/config/).
+
+## Project Setup
+
+```sh
+npm install
+```
+
+### Compile and Hot-Reload for Development
+
+```sh
+npm run dev
+```
+
+### Compile and Minify for Production
+
+```sh
+npm run build
+```
+
+
+========== FILE: E:\LEAR-CODE\vue-demo\vite.config.js ==========
+
+import { fileURLToPath, URL } from 'node:url'
+
+import { defineConfig } from 'vite'
+import vue from '@vitejs/plugin-vue'
+import vueDevTools from 'vite-plugin-vue-devtools'
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [
+    vue(),
+    vueDevTools(),
+  ],
+  resolve: {
+    alias: {
+      '@': fileURLToPath(new URL('./src', import.meta.url))
+    },
+  },
+})

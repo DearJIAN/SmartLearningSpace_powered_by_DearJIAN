@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YOLOv11 智能检测系统</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+</head>
+<body>
+
+    <div class="header rainbow-header">
+        <h1>🚀 基于 YOLOv11 目标检测系统 (Web版)</h1>
+    </div>
+
+    <div class="main-layout">
+        <div class="sidebar">
+            <h3 class="section-title">⚙️ 输入源与参数</h3>
+
+            <div class="control-group">
+                <label>📡 输入类型</label>
+                <div class="radio-group">
+                    <label class="radio-label">
+                        <input type="radio" name="inputType" value="path" checked onchange="toggleInput(this.value)">
+                        📂 文件/文件夹
+                    </label>
+                    <label class="radio-label">
+                        <input type="radio" name="inputType" value="camera" onchange="toggleInput(this.value)">
+                        📷 摄像头
+                    </label>
+                </div>
+            </div>
+
+            <div class="control-group" id="pathInputGroup">
+                <label>📍 本地路径 (点选 example 或 手动输入)</label>
+                <input type="text" id="pathInput" list="pathOptions" placeholder="📂 点击选择或粘贴路径..." onfocus="this.value=''">
+                <datalist id="pathOptions"></datalist>
+            </div>
+
+            <div class="control-group">
+                <label>🧠 模型选择 (点选 models 或 手动输入)</label>
+                <input type="text" id="modelInput" list="modelOptions" placeholder="🤖 点击这里选择模型..." onfocus="this.value=''">
+                <datalist id="modelOptions"></datalist>
+            </div>
+
+            <div class="control-group">
+                <label>🎯 置信度 (Conf)</label>
+                <input type="number" id="confThres" step="0.01" min="0" max="1" value="0.25">
+            </div>
+
+            <div class="control-group">
+                <label>🧩 IOU 阈值</label>
+                <input type="number" id="iouThres" step="0.01" min="0" max="1" value="0.45">
+            </div>
+
+            <div class="control-group">
+                <label>📏 图像尺寸 (Size)</label>
+                <input type="number" id="imgSz" value="640">
+            </div>
+
+            <div class="control-group">
+                <label style="margin-bottom: 5px;">💾 保存选项</label>
+                <div class="checkbox-item"><input type="checkbox" id="saveTxt"> 📝 保存 TXT</div>
+                <div class="checkbox-item"><input type="checkbox" id="saveConf"> 📊 保存置信度</div>
+                <div class="checkbox-item"><input type="checkbox" id="saveCrop"> 🖼️ 保存截图 (Crop)</div>
+            </div>
+
+            <div class="btn-group">
+                <button class="btn btn-run" onclick="startSystem()">▶️ 运行代码 (Run)</button>
+                <button id="btnPause" class="btn btn-pause" onclick="pauseSystem()">⏸️ 暂停 (Pause)</button>
+                <button class="btn btn-stop" onclick="stopSystem()">⏹️ 终止推理 (Stop)</button>
+            </div>
+        </div>
+
+        <div class="display-area">
+            <div class="placeholder" id="placeholder">
+                <div style="font-size: 3rem;">📺</div>
+                <p>等待运行...</p>
+            </div>
+            <img id="videoStream" src="">
+        </div>
+
+        <div class="results-panel">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 10px;">
+                <h3 style="margin:0; font-size:16px;">📋 检测结果列表</h3>
+                <button class="btn-clear" onclick="clearResults()">🗑️ 清空列表</button>
+            </div>
+            <div class="table-wrapper">
+                <table id="resultTable">
+                    <thead><tr><th style="width: 60px;">#️⃣ 序号</th><th>📂 结果保存路径</th></tr></thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <div class="float-widget-container">
+
+        <div class="float-window chart-window" id="chartWindow">
+            <div class="window-header chart-header-bg">
+                <span>📊 实时检测统计</span>
+                <span class="close-btn" onclick="toggleChart()">✖</span>
+            </div>
+            <div class="window-body">
+                <div id="mainChart" style="width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+
+        <div class="float-window chat-window" id="chatWindow">
+            <div class="window-header ai-header-bg">
+                <span>🤖 智能助手</span>
+                <span class="close-btn" onclick="toggleChat()">✖</span>
+            </div>
+            <div class="chat-body" id="chatBody">
+                <div class="chat-msg bot">你好！我是你的 AI 助手，有什么可以帮你的吗？</div>
+            </div>
+            <div class="chat-footer">
+                <input type="text" id="chatInput" placeholder="输入问题..." onkeypress="handleEnter(event)">
+                <button onclick="sendMessage()">🚀 发送</button>
+            </div>
+        </div>
+
+        <div class="float-btn-group">
+            <button class="float-btn chart-btn" onclick="toggleChart()" title="查看实时统计">
+                <span class="icon">📊</span>
+                <span class="text">实时统计</span>
+            </button>
+            <button class="float-btn ai-btn" onclick="toggleChat()" title="点击召唤 AI 助手">
+                <span class="icon">🤖</span>
+                <span class="text">AI 助手</span>
+            </button>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
