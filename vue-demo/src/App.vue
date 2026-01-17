@@ -30,6 +30,11 @@
           <span>座位预约</span>
         </el-menu-item>
         
+        <el-menu-item index="/accounting/login">
+          <el-icon><Wallet /></el-icon>
+          <span>个人记账</span>
+        </el-menu-item>
+        
         <el-menu-item index="/analysis" disabled>
           <el-icon><PieChart /></el-icon>
           <span>数据分析</span>
@@ -62,7 +67,7 @@
 </template>
 
 <script setup>
-import { Monitor, Calendar, PieChart, Location } from '@element-plus/icons-vue'
+import { Monitor, Calendar, PieChart, Location, Wallet } from '@element-plus/icons-vue'
 </script>
 
 <style>

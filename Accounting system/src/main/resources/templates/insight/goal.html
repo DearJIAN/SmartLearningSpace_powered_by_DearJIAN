@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <title>目标管理</title>
+    <style>
+        body {
+            font-family: '微软雅黑', sans-serif;
+            background-color: #f5f7fa;
+            padding: 20px;
+        }
+
+        .nav-bar {
+            margin-bottom: 20px;
+            background: #fff;
+            padding: 15px;
+            border-radius: 4px;
+        }
+
+        .nav-bar a {
+            text-decoration: none;
+            color: #409EFF;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .header {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid #ebeef5;
+            padding-bottom: 15px;
+            margin-bottom: 15px;
+        }
+
+        .money-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .progress-container {
+            height: 20px;
+            background-color: #ebeef5;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background-color: #67C23A;
+            width: 0%;
+            transition: width 0.6s ease;
+            text-align: center;
+            color: white;
+            line-height: 20px;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+<div class="nav-bar">
+    <span>功能导航：</span>
+    <a href="/index" style="color: #67C23A">🏠 返回首页</a>
+    <a href="/insight/view/dashboard">洞察中心</a>
+    <a href="/insight/view/profile">财务画像</a>
+    <a href="/insight/view/timeline">时光机</a>
+    <a href="/insight/view/risk">风险预警</a>
+    <a href="/insight/view/goal">目标管理</a>
+</div>
+
+<h2>🎯 目标管理 (Beta)</h2>
+
+<div class="card">
+    <div class="header">
+        <strong>🏠 年度存款目标</strong>
+        <button onclick="toggleForm()" style="border:none; background:none; color:#409EFF; cursor:pointer;">✏️
+            修改目标
+        </button>
+    </div>
+
+    <!-- 新增：目标设置表单 -->
+    <div id="goal-form" style="display:none; padding:15px; background:#f0f9eb; margin-bottom:15px; border-radius:4px;">
+        <div style="margin-bottom:10px;">
+            目标金额: <input id="new-amount" style="width:100px; padding:5px;" type="number">
+            截止日期: <input id="new-date" style="padding:5px;" type="date">
+        </div>
+        <button onclick="saveGoal()"
+                style="background:#67C23A; color:white; border:none; padding:5px 15px; border-radius:3px; cursor:pointer;">
+            保存
+        </button>
+        <button onclick="toggleForm()"
+                style="background:#909399; color:white; border:none; padding:5px 15px; border-radius:3px; cursor:pointer;">
+            取消
+        </button>
+    </div>
+
+    <div class="money-row">
+        <span>已存: <strong id="saved" style="color:#67C23A">Loading...</strong></span>
+        <span>目标: <strong id="target">Loading...</strong></span>
+    </div>
+
+    <div class="progress-container">
+        <div class="progress-fill" id="progress">0%</div>
+    </div>
+
+    <div style="margin-top: 20px; color: #909399; font-size: 13px;">
+        📅 预计达成时间：<span id="date">Calculating...</span>
+    </div>
+</div>
+
+<script>
+    fetch('/api/insight/goal')
+        .then(res => res.json())
+        .then(data => {
+            document.getElementById('saved').innerText = '￥' + data.currentSaved;
+            document.getElementById('target').innerText = '￥' + data.targetAmount;
+            document.getElementById('date').innerText = data.estimateDate;
+
+            const p = Math.min(data.progress, 100).toFixed(1) + '%';
+            const el = document.getElementById('progress');
+            el.style.width = p;
+            el.innerText = p;
+        });
+
+    function toggleForm() {
+        const form = document.getElementById('goal-form');
+        form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    function saveGoal() {
+        const amount = document.getElementById('new-amount').value;
+        const date = document.getElementById('new-date').value;
+
+        if (!amount || !date) {
+            alert("请填写完整！");
+            return;
+        }
+
+        fetch('/api/insight/goal', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({amount, date})
+        }).then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    alert("设置成功！");
+                    location.reload();
+                }
+            });
+    }
+</script>
+</body>
+</html>

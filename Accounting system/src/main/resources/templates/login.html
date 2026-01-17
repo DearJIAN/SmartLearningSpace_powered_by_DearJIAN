@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>登录 - 个人记账系统</title>
+    <!-- 引入 Bootstrap -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入 FontAwesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            height: 100vh;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            /* 背景使用高级的渐变色 */
+            background: linear-gradient(135deg, #a18cd1 0%, #fbc2eb 100%);
+            overflow: hidden; /* 防止漂浮物超出屏幕产生滚动条 */
+            position: relative;
+        }
+
+        /* 登录卡片样式 - 磨砂玻璃质感 */
+        .login-card {
+            width: 400px;
+            padding: 40px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            /* 👇 关键：登录框层级为 100，浮动元素默认 1，hover时 101 */
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+        }
+
+        /* === Hanabi 助手基础样式 === */
+        .hanabi-item {
+            position: absolute;
+            /* 👇 关键修改：固定定位起点，并设置变换原点为左上角 */
+            left: 0;
+            top: 0;
+            transform-origin: top left;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            /* 👇 默认层级低于登录框 */
+            z-index: 1;
+            cursor: pointer;
+            user-select: none; /* 防止移动时选中文字 */
+        }
+
+        .hanabi-item:hover {
+            /* 👇 悬停时层级高于登录框，实现从背后“浮出来”的效果 */
+            z-index: 101;
+        }
+
+        /* 👇 新增呼吸灯动画 */
+        @keyframes breathing-glow {
+            0% {
+                box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            }
+            50% {
+                box-shadow: 0 0 25px currentColor;
+            }
+            /* 使用 currentColor 跟随边框颜色 */
+            100% {
+                box-shadow: 0 0 5px rgba(255, 255, 255, 0.5);
+            }
+        }
+
+        .hanabi-avatar {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            object-fit: cover;
+            border: 4px solid #fff;
+            background-color: white;
+
+            /* 应用呼吸灯动画 */
+            animation: breathing-glow 2s infinite ease-in-out alternate;
+            /* 同时允许叠加其他 transform 动画 (需注意 animation 属性覆盖问题，最好分开写或用包裹层) */
+            /* 这里动画主要控制 box-shadow，其他 transforms 通过具体的类名覆盖或叠加 */
+        }
+
+        .hanabi-bubble {
+            background: #fff;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 10px;
+            white-space: nowrap;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.1);
+            position: relative;
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        /* 气泡下的小三角 */
+        .hanabi-bubble::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 50%;
+            transform: translateX(-50%);
+            border-width: 5px 5px 0;
+            border-style: solid;
+            border-color: #fff transparent transparent transparent;
+        }
+
+        /* === 内部微动作动画 (只改变形态/旋转，不改变位置) === */
+
+        /* 1. 也是呼吸，但针对大小 */
+        @keyframes pulse-size {
+            0%, 100% {
+                transform: scale(1);
+            }
+            50% {
+                transform: scale(1.1);
+            }
+        }
+
+        /* 2. 也是摇摆 */
+        @keyframes swing-rotate {
+            0% {
+                transform: rotate(10deg);
+            }
+            50% {
+                transform: rotate(-10deg);
+            }
+            100% {
+                transform: rotate(10deg);
+            }
+        }
+
+        /* 3. 360度旋转 */
+        @keyframes spin-circle {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        }
+
+        /* 4. 左右摇头 */
+        @keyframes shake-head {
+            0%, 100% {
+                transform: translateX(0);
+            }
+            25% {
+                transform: translateX(-5px) rotate(-5deg);
+            }
+            75% {
+                transform: translateX(5px) rotate(5deg);
+            }
+        }
+
+        /* 5. 上下轻微浮动 (内部) */
+        @keyframes bobbing {
+            0%, 100% {
+                transform: translateY(0);
+            }
+            50% {
+                transform: translateY(-10px);
+            }
+        }
+
+        /* 
+           组合动画：
+           呼吸灯 (breathing-glow) + 动作动画
+         */
+
+        .anim-pulse {
+            animation: pulse-size 2s ease-in-out infinite, breathing-glow 2s infinite ease-in-out alternate;
+        }
+
+        .anim-swing {
+            animation: swing-rotate 3s ease-in-out infinite, breathing-glow 2s infinite ease-in-out alternate;
+        }
+
+        .anim-spin {
+            animation: spin-circle 10s linear infinite, breathing-glow 2s infinite ease-in-out alternate;
+        }
+
+        .anim-shake {
+            animation: shake-head 4s ease-in-out infinite, breathing-glow 2s infinite ease-in-out alternate;
+        }
+
+        .anim-bob {
+            animation: bobbing 2.5s ease-in-out infinite, breathing-glow 2s infinite ease-in-out alternate;
+        }
+
+    </style>
+</head>
+<body>
+
+<!-- 1. 简捷的登录框 -->
+<div class="login-card text-center">
+    <h3 class="mb-4 fw-bold" style="color: #667eea;">
+        <i class="fas fa-wallet me-2"></i>MyBookkeeping
+    </h3>
+    <form action="/login" class="text-start" method="post">
+        <div class="mb-3">
+            <label class="form-label text-secondary">账号</label>
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="fas fa-user text-muted"></i></span>
+                <input class="form-control border-start-0 ps-0" name="username" placeholder="请输入用户名" required
+                       type="text">
+            </div>
+        </div>
+        <div class="mb-4">
+            <label class="form-label text-secondary">密码</label>
+            <div class="input-group">
+                <span class="input-group-text bg-light border-end-0"><i class="fas fa-lock text-muted"></i></span>
+                <input class="form-control border-start-0 ps-0" name="password" placeholder="请输入密码" required
+                       type="password">
+            </div>
+        </div>
+        <div class="d-grid mb-3">
+            <button class="btn btn-primary btn-lg" style="background: linear-gradient(to right, #667eea, #764ba2); border: none;"
+                    type="submit">
+                立即登录
+            </button>
+        </div>
+
+        <!-- 👇 新增注册入口 -->
+        <div class="text-center mb-3">
+            <a class="text-decoration-none text-secondary small" th:href="@{/register}">
+                <i class="fas fa-user-plus me-1"></i>还没有账号？立即注册
+            </a>
+        </div>
+
+        <div class="alert alert-danger py-2 small text-center" th:if="${param.error}">
+            <i class="fas fa-exclamation-circle me-1"></i> 用户名或密码错误
+        </div>
+    </form>
+    <p class="mt-3 text-muted small">© T1-玩家国度小组个人智能记账系统</p>
+    <p class="mt-3 text-muted small">©孙神健 许庆基 田琦 张京阳 闫宇函</p>
+</div>
+
+<!-- 2. 动态生成的 Hanabi 舞台 -->
+<div id="hanabi-stage"></div>
+
+<!-- JS 逻辑 -->
+<script th:inline="javascript">
+    const stage = document.getElementById('hanabi-stage');
+    const imgPath = /*[[@{/images/hanabi.jpg}]]*/ '/images/hanabi.jpg';
+    const colors = ['#FF6B6B', '#4ECDC4', '#FFE66D', '#FF9F43', '#5f27cd'];
+    // 对应 CSS 中的新动画类名
+    const animations = ['anim-pulse', 'anim-swing', 'anim-spin', 'anim-shake', 'anim-bob'];
+    const messages = ['✨ 点我帮你分析', '💰 记得记账哦', '🤖 AI理财助手', '📈 拒绝月光!', '🎉 欢迎回来!'];
+
+    // 存储所有漂浮对象的状态
+    const floaters = [];
+    const speedBase = 0.8; // 基础移动速度
+
+    // 生成5个
+    for (let i = 0; i < 5; i++) {
+        createHanabi(i);
+    }
+
+    // 启动动画循环
+    requestAnimationFrame(updatePositions);
+
+    function createHanabi(index) {
+        const el = document.createElement('div');
+        el.className = 'hanabi-item';
+
+        // 1. 构建 HTML 内容
+        const color = colors[index % colors.length];
+        const animClass = animations[index % animations.length];
+        const msg = messages[index % messages.length];
+
+        let htmlInner = `<div class="hanabi-bubble" style="color: ${color}; border-color: ${color}">${msg}</div>`;
+        htmlInner += `<img src="${imgPath}" class="hanabi-avatar ${animClass}" style="border-color: ${color}; color: ${color};">`;
+
+        el.innerHTML = htmlInner;
+
+        // 2. 先添加到舞台，以便计算真实尺寸
+        stage.appendChild(el);
+
+        // 3. 计算尺寸和随机属性 (关键步骤)
+        const rect = el.getBoundingClientRect();
+        // 随机大小 (1.0 ~ 1.5倍)
+        const scale = 1.0 + Math.random() * 0.5;
+
+        // 计算缩放后的实际占用宽高，用于碰撞检测
+        const realWidth = rect.width * scale;
+        const realHeight = rect.height * scale;
+
+        // 4. 随机初始位置 (确保完全在屏幕内)
+        // 减去 realWidth/realHeight 确保生成时不会只有一般在屏幕内
+        const maxX = window.innerWidth - realWidth;
+        const maxY = window.innerHeight - realHeight;
+
+        // Math.max(0, ...) 防止窗口极小导致负数
+        let x = Math.random() * Math.max(0, maxX);
+        let y = Math.random() * Math.max(0, maxY);
+
+        // 5. 随机速度向量 (vx, vy)
+        let vx = (Math.random() - 0.5) * speedBase * 2;
+        let vy = (Math.random() - 0.5) * speedBase * 2;
+
+        // 存入数组
+        floaters.push({
+            el: el,
+            x: x,
+            y: y,
+            vx: vx,
+            vy: vy,
+            scale: scale,
+            width: realWidth,
+            height: realHeight
+        });
+    }
+
+    function updatePositions() {
+        const maxX = window.innerWidth;
+        const maxY = window.innerHeight;
+
+        floaters.forEach(obj => {
+            // 更新位置
+            obj.x += obj.vx;
+            obj.y += obj.vy;
+
+            // 边界碰撞检测 (反弹逻辑)
+            // 左边界 或 右边界 (x + 宽度 >= 屏幕宽)
+            if (obj.x <= 0) {
+                obj.x = 0; // 修正位置，防止卡在墙里
+                obj.vx *= -1; // 速度反向
+            } else if (obj.x + obj.width >= maxX) {
+                obj.x = maxX - obj.width;
+                obj.vx *= -1;
+            }
+
+            // 上边界 或 下边界 (y + 高度 >= 屏幕高)
+            if (obj.y <= 0) {
+                obj.y = 0;
+                obj.vy *= -1;
+            } else if (obj.y + obj.height >= maxY) {
+                obj.y = maxY - obj.height;
+                obj.vy *= -1;
+            }
+
+            // 应用样式
+            // 使用 translate3d 开启硬件加速，移动更流畅
+            obj.el.style.transform = `translate3d(${obj.x}px, ${obj.y}px, 0) scale(${obj.scale})`;
+        });
+
+        requestAnimationFrame(updatePositions);
+    }
+</script>
+</body>
+</html>

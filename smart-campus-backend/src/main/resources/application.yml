@@ -25,3 +25,10 @@ mybatis-plus:
       logic-delete-field: deleted
       logic-delete-value: 1
       logic-not-delete-value: 0
+
+# AI 配置
+ai:
+  doubao:
+    api-url: https://ark.cn-beijing.volces.com/api/v3/chat/completions
+    api-key: c0a5e654-d53a-4480-87f8-a7956b27601d
+    model-id: doubao-seed-1-6-251015

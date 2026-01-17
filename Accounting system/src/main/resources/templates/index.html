@@ -1,0 +1,1459 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>首页 - 个人记账系统</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <!-- Markdown 解析库 & 代码高亮 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github-dark.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <!-- SweetAlert2 CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <style>
+        /* SweetAlert2 z-index fix for Bootstrap Modals */
+        .swal2-container {
+            z-index: 2000 !important;
+        }
+
+        /* Hanabi Bot 动画样式 */
+        .bot-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 120px;
+            height: 120px;
+            z-index: 1000;
+            cursor: pointer;
+            animation: float 3s ease-in-out infinite;
+        }
+
+        .bot-avatar {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            border-radius: 50%;
+            border: 4px solid #fff;
+            box-shadow: 0 0 20px rgba(217, 37, 80, 0.6);
+            transition: transform 0.3s;
+        }
+
+        .bot-container:hover .bot-avatar {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px rgba(217, 37, 80, 0.9);
+        }
+
+        .chat-bubble {
+            position: absolute;
+            top: -40px;
+            right: 0;
+            background-color: #fff;
+            color: #333;
+            padding: 8px 12px;
+            border-radius: 15px;
+            border-bottom-right-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+            white-space: nowrap;
+            animation: pop-in 6s infinite;
+        }
+
+        @keyframes float {
+            0% {
+                transform: translateY(0) rotate(0);
+            }
+            50% {
+                transform: translateY(-10px) rotate(2deg);
+            }
+            100% {
+                transform: translateY(0) rotate(0);
+            }
+        }
+
+        @keyframes pop-in {
+            0%, 90%, 100% {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            10%, 80% {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* 聊天窗口样式 - 修改为响应式 */
+        .chat-window {
+            display: none;
+            position: fixed;
+            bottom: 160px;
+            right: 30px;
+            width: 400px; /* 默认宽度 */
+            height: 600px; /* 默认高度 */
+            max-width: 90vw; /* 加上最大宽度限制，适应移动端 */
+            max-height: 70vh; /* 加上最大高度限制 */
+            background: #fff;
+            border-radius: 15px;
+            box-shadow: 0 5px 30px rgba(0, 0, 0, 0.3);
+            z-index: 999;
+            flex-direction: column;
+            overflow: hidden;
+            font-family: sans-serif;
+            transition: all 0.3s ease; /* 添加过渡效果 */
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 576px) {
+            .chat-window {
+                right: 5%;
+                width: 90%;
+                bottom: 100px;
+                height: 60vh;
+            }
+
+            .bot-container {
+                right: 20px;
+                bottom: 20px;
+                width: 80px;
+                height: 80px;
+            }
+        }
+
+        /* 聊天窗口头部样式 */
+        .chat-header {
+            background: linear-gradient(135deg, #FF6B6B, #556270);
+            color: white;
+            padding: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chat-body {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f8f9fa;
+        }
+
+        .chat-footer {
+            padding: 10px;
+            border-top: 1px solid #eee;
+            background: white;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            max-width: 85%;
+        }
+
+        .message.user {
+            margin-left: auto;
+            text-align: right;
+        }
+
+        .message.bot {
+            margin-right: auto;
+        }
+
+        .bubble {
+            display: inline-block;
+            padding: 10px 15px;
+            border-radius: 10px;
+            text-align: left;
+            word-break: break-word;
+        }
+
+        .message.user .bubble {
+            background: #007bff;
+            color: white;
+            border-bottom-right-radius: 2px;
+        }
+
+        .message.bot .bubble {
+            background: #e9ecef;
+            color: #333;
+            border-bottom-left-radius: 2px;
+        }
+
+        /* Markdown 样式微调: 增加表格边框样式 */
+        .bubble table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 15px 0;
+            font-size: 0.9em;
+            background: #fff;
+        }
+
+        .bubble th, .bubble td {
+            border: 1px solid #dfe2e5;
+            padding: 8px 12px;
+            text-align: left;
+        }
+
+        .bubble th {
+            background-color: #f6f8fa;
+            font-weight: bold;
+            color: #24292e;
+        }
+
+        /* 标题样式增强 */
+        .bubble h1, .bubble h2, .bubble h3, .bubble h4 {
+            margin-top: 20px;
+            margin-bottom: 10px;
+            font-weight: 600;
+            line-height: 1.25;
+            color: #24292e;
+            border-bottom: 1px solid #eaecef;
+            padding-bottom: 0.3em;
+        }
+
+        .bubble h3 {
+            font-size: 1.25em;
+        }
+
+        .bubble h4 {
+            font-size: 1em;
+        }
+
+        /* 思考中的动画点 */
+        .typing-indicator {
+            display: inline-flex;
+            align-items: center;
+            padding: 5px 10px;
+        }
+
+        .typing-indicator span {
+            display: block;
+            width: 6px;
+            height: 6px;
+            background-color: #fff; /* 这里强制白色，配合深色背景 */
+            border-radius: 50%;
+            margin: 0 2px;
+            animation: typing 1.4s infinite ease-in-out both;
+        }
+
+        /* 👇 修改：使用最经典的动态渐变方案 */
+        .message.bot .bubble.thinking {
+            /* 1. 显式定义渐变图，使用鲜艳的颜色 */
+            background-image: linear-gradient(
+                    -45deg,
+                    #ee7752,
+                    #e73c7e,
+                    #23a6d5,
+                    #23d5ab
+            ) !important;
+
+            /* 2. 背景尺寸必须放大，否则看不到流动效果 */
+            background-size: 400% 400% !important;
+
+            /* 3. 动画：3秒循环 */
+            animation: gradient-move 3s ease infinite !important;
+
+            color: white !important;
+            border: none !important;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3) !important;
+
+            min-height: 40px;
+            min-width: 80px;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
+        /* 专门定义的背景移动动画 */
+        @keyframes gradient-move {
+            0% {
+                background-position: 0% 50%;
+            }
+            50% {
+                background-position: 100% 50%;
+            }
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+
+        /* 👇 新增：计算器样式 */
+        .calc-btn {
+            width: 100%;
+            height: 50px;
+            font-size: 1.25rem;
+            font-weight: bold;
+            margin-bottom: 8px;
+            border-radius: 8px;
+        }
+
+        .calc-display {
+            background: #2c3e50;
+            color: #2ecc71;
+            font-family: 'Courier New', Courier, monospace;
+            height: 70px;
+            font-size: 2.2rem;
+            text-align: right;
+            padding: 10px 15px;
+            margin-bottom: 15px;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.5);
+        }
+
+        .calc-btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* ========== 新增: 分类图标按钮 样式 ========== */
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(8, minmax(50px, 1fr));
+            gap: 10px;
+            border: 1px solid #ced4da;
+            padding: 7px;
+            border-radius: 5px;
+        }
+
+        /* 响应式退让：屏幕窄时依次降级列数 */
+        @media (max-width: 1400px) {
+            .category-grid {
+                grid-template-columns: repeat(6, minmax(72px, 1fr));
+            }
+        }
+
+        @media (max-width: 992px) {
+            .category-grid {
+                grid-template-columns: repeat(4, minmax(72px, 1fr));
+            }
+        }
+
+        @media (max-width: 600px) {
+            .category-grid {
+                grid-template-columns: repeat(3, minmax(64px, 1fr));
+            }
+        }
+
+        @media (max-width: 420px) {
+            .category-grid {
+                grid-template-columns: repeat(2, minmax(56px, 1fr));
+            }
+        }
+
+        .cat-btn {
+            background: #fff;
+            border-radius: 12px;
+            /* 使用宽高比保持正方形 */
+            aspect-ratio: 1 / 1;
+            min-width: 50px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #e9ecef;
+            cursor: pointer;
+            transition: transform .12s ease, box-shadow .12s ease, background .12s ease;
+            color: #333;
+            text-decoration: none;
+        }
+
+        .cat-btn .icon {
+            font-size: 20px;
+            margin-bottom: 6px;
+            color: #6f6f6f6f;
+        }
+
+        .cat-btn.active .icon {
+            color: #fff;
+        }
+
+        .cat-btn .label {
+            font-size: 0.75rem;
+            line-height: 1;
+            text-align: center;
+        }
+
+        .cat-btn:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 18px rgba(0, 0, 0, 0.06);
+        }
+
+        .cat-btn.active {
+            background: linear-gradient(135deg, #FF6B6B, #556270);
+            color: #fff;
+            border: none;
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.16);
+        }
+
+        /* 在模态框中使用时，按钮稍微紧凑 */
+        .modal .category-grid .cat-btn {
+            min-width: 50px;
+            aspect-ratio: 1 / 1;
+        }
+
+        /* 小屏调整文字大小 */
+        @media (max-width: 420px) {
+            .cat-btn .label {
+                font-size: 0.85rem;
+            }
+
+            .cat-btn {
+                min-width: 72px;
+            }
+        }
+
+        /* 👇 新增：预算进度条样式 */
+        .progress {
+            background-color: rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+
+        .progress-bar {
+            transition: width 0.6s ease;
+            border-radius: 5px;
+        }
+
+        .progress-bar.bg-danger {
+            background-image: linear-gradient(45deg, #dc3545 25%, transparent 25%, transparent 50%, #dc3545 50%, #dc3545 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+            animation: progress-stripes 1s linear infinite;
+        }
+
+        .progress-bar.bg-success {
+            background-image: linear-gradient(45deg, #198754 25%, transparent 25%, transparent 50%, #198754 50%, #198754 75%, transparent 75%, transparent);
+            background-size: 1rem 1rem;
+        }
+
+        @keyframes progress-stripes {
+            0% {
+                background-position: 1rem 0;
+            }
+            100% {
+                background-position: 0 0;
+            }
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+<!-- 导航栏 -->
+<nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <div class="container">
+        <a class="navbar-brand" href="#"><i class="fas fa-wallet me-2"></i>MyBookkeeping</a>
+        <div class="collapse navbar-collapse">
+            <ul class="navbar-nav me-auto">
+                <li class="nav-item"><a class="nav-link active" href="/index">账单明细</a></li>
+                <li class="nav-item"><a class="nav-link" href="/analysis">统计报表</a></li>
+                <li class="nav-item"><a class="nav-link" href="/treemap">资金流向树</a></li>
+                <!-- 👇 新增导航项 -->
+                <li class="nav-item"><a class="nav-link" href="/calendar">账单日历</a></li>
+
+                <li class="nav-item">
+                    <a class="nav-link fw-bold text-warning" href="/insight/view/dashboard">
+                        <i class="fas fa-lightbulb me-1"></i>洞察中心
+                    </a>
+                </li>
+            </ul>
+            <div class="d-flex align-items-center text-white">
+                <span class="me-3">欢迎, <span th:text="${user != null ? user.username : 'Guest'}">User</span></span>
+                <a class="btn btn-sm btn-outline-light" href="/logout">退出</a>
+            </div>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="row">
+        <!-- 👈 左侧工具栏 -->
+        <div class="col-md-3 mb-4">
+
+            <!-- 👇 新增：对账统计卡片 (放在最上面) -->
+            <div class="card shadow-sm mb-3 border-0 bg-primary text-white bg-gradient">
+                <div class="card-body">
+                    <h6 class="card-title mb-3"><i class="fas fa-chart-pie me-2"></i>本期概览</h6>
+                    <div class="row text-center g-2">
+                        <div class="col-6">
+                            <small style="opacity: 0.8">总收入</small>
+                            <div class="fw-bold" th:text="${stats.income}">0.00</div>
+                        </div>
+                        <div class="col-6">
+                            <small style="opacity: 0.8">总支出</small>
+                            <div class="fw-bold" th:text="${stats.expense}">0.00</div>
+                        </div>
+                        <div class="col-12 mt-2 pt-2 border-top border-white border-opacity-25">
+                            <small style="opacity: 0.8">结余</small>
+                            <div class="h4 fw-bold mb-0" th:text="${stats.balance}">0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 👇 新增：月度预算卡片 -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white py-2">
+                    <h6 class="mb-0"><i class="fas fa-coins text-warning me-2"></i>月度预算 <small class="text-muted"
+                                                                                                   th:text="${currentMonth}">2024-01</small>
+                    </h6>
+                </div>
+                <div class="card-body">
+                    <div class="mb-2">
+                        <div class="d-flex justify-content-between small mb-1">
+                            <span>预算进度</span>
+                            <span th:text="${budget.used} + ' / ' + ${budget.total}">0 / 0</span>
+                        </div>
+                        <div class="progress" style="height: 10px;">
+                            <div class="progress-bar"
+                                 th:classappend="${budget.isOver ? 'bg-danger' : 'bg-success'}"
+                                 th:style="'width: ' + ${budget.progress} + '%'"></div>
+                        </div>
+                    </div>
+                    <div class="row text-center mt-3">
+                        <div class="col-6">
+                            <small class="text-muted">已使用</small>
+                            <div class="fw-bold" th:classappend="${budget.isOver ? 'text-danger' : 'text-success'}"
+                                 th:text="${budget.used}">0.00
+                            </div>
+                        </div>
+                        <div class="col-6">
+                            <small class="text-muted">剩余</small>
+                            <div class="fw-bold"
+                                 th:classappend="${budget.remaining < 0 ? 'text-danger' : 'text-primary'}"
+                                 th:text="${budget.remaining}">0.00
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-center mt-2" th:if="${budget.total == 0}">
+                        <small class="text-muted">
+                            <i class="fas fa-info-circle me-1"></i>未设置预算，点击上方按钮设置
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 1. 快捷工具箱 -->
+            <div class="card shadow-sm mb-3">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="fas fa-toolbox text-secondary me-2"></i>快捷工具箱</h6>
+                </div>
+                <div class="card-body">
+                    <label class="form-label small text-muted">随机生成账单</label>
+                    <div class="input-group mb-3">
+                        <input class="form-control form-control-sm" id="genCount" max="50" min="1" type="number"
+                               value="5">
+                        <button class="btn btn-sm btn-outline-primary" onclick="generateBills()">生成</button>
+                    </div>
+
+                    <!-- 👇 新增：计算器入口按钮 -->
+                    <button class="btn btn-sm btn-outline-info w-100 mb-2" data-bs-target="#calcModal"
+                            data-bs-toggle="modal">
+                        <i class="fas fa-calculator me-1"></i>随手计算器
+                    </button>
+
+                    <!-- 👇 新增：预算设置入口 -->
+                    <button class="btn btn-sm btn-outline-warning w-100 mb-2" onclick="openBudgetModal()">
+                        <i class="fas fa-coins me-1"></i>设置月度预算
+                    </button>
+
+                    <hr class="my-2">
+                    <button class="btn btn-sm btn-outline-danger w-100" onclick="clearBills()">
+                        <i class="fas fa-trash-alt me-1"></i>清空所有数据
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. 财务健康简报 -->
+            <div class="card shadow-sm text-center">
+                <div class="card-header bg-white">
+                    <h6 class="mb-0"><i class="fas fa-heartbeat text-danger me-2"></i>财务健康</h6>
+                </div>
+                <div class="card-body">
+                    <div id="healthLoading" style="display:none">
+                        <div class="spinner-border text-primary spinner-border-sm" role="status"></div>
+                        计算中...
+                    </div>
+                    <div id="healthContent">
+                        <div class="display-6 mb-2">🤔</div>
+                        <p class="text-muted small">点击下方按钮体检</p>
+                    </div>
+                    <button class="btn btn-sm btn-primary w-100 mt-2" onclick="checkHealth()">立即体检</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 👉 右侧主内容 (原有内容移动到这里) -->
+        <div class="col-md-9">
+            <!-- 原有的顶部操作栏 (Search Form) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <form action="/index" class="row g-3 align-items-end" method="get">
+                        <div class="col-md-4">
+                            <label class="form-label">日期范围</label>
+                            <div class="input-group">
+                                <input class="form-control" name="startDate" th:value="${param.startDate}" type="date">
+                                <span class="input-group-text">-</span>
+                                <input class="form-control" name="endDate" th:value="${param.endDate}" type="date">
+                            </div>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">分类</label>
+                            <select class="form-select" name="categoryId">
+                                <option value="">全部</option>
+                                <option th:each="c : ${categories}" th:text="${c.name}" th:value="${c.id}"></option>
+                            </select>
+                        </div>
+                        <div class="col-md-2">
+                            <button class="btn btn-primary w-100" type="submit"><i class="fas fa-search me-1"></i> 查询
+                            </button>
+                        </div>
+                        <div class="col-md-3 text-end">
+                            <div class="btn-group w-100">
+                                <button class="btn btn-success" onclick="openAddModal()" type="button">
+                                    <i class="fas fa-plus"></i> 记一笔
+                                </button>
+                                <a class="btn btn-outline-success" href="/bill/export" target="_blank">
+                                    <i class="fas fa-file-excel"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- 原有的账单列表 -->
+            <div class="card shadow-sm">
+                <div class="card-header bg-white py-3">
+                    <h5 class="mb-0 text-secondary">最近账单</h5>
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>日期</th>
+                            <th>分类</th>
+                            <th>类型</th>
+                            <th>金额</th>
+                            <th>备注</th>
+                            <th>操作</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        <tr th:each="bill : ${page.records}">
+                            <td th:text="${bill.billDate}">2023-01-01</td>
+                            <td><span class="badge bg-secondary" th:text="${bill.categoryName}">餐饮</span></td>
+                            <td>
+                                <span class="text-success fw-bold" th:if="${bill.type == 1}"><i
+                                        class="fas fa-arrow-down"></i> 收入</span>
+                                <span class="text-danger fw-bold" th:if="${bill.type == 2}"><i
+                                        class="fas fa-arrow-up"></i> 支出</span>
+                            </td>
+                            <td class="fw-bold" th:text="${bill.amount}">100.00</td>
+                            <td class="text-muted small" th:text="${bill.remark}">无</td>
+                            <td>
+                                <!-- 编辑按钮 -->
+                                <button class="btn btn-sm btn-link text-primary"
+                                        onclick="editBill(this.getAttribute('data-id'), this.getAttribute('data-type'), this.getAttribute('data-amount'), this.getAttribute('data-cat'), this.getAttribute('data-date'), this.getAttribute('data-remark'))"
+                                        th:data-amount="${bill.amount}"
+                                        th:data-cat="${bill.categoryId}"
+                                        th:data-date="${bill.billDate}"
+                                        th:data-id="${bill.id}"
+                                        th:data-remark="${bill.remark}"
+                                        th:data-type="${bill.type}">
+                                    <i class="fas fa-edit"></i>
+                                </button>
+                                <a class="btn btn-sm btn-link text-danger" onclick="return confirm('确定删除吗？')"
+                                   th:href="@{'/bill/delete/' + ${bill.id}}"><i class="fas fa-trash"></i></a>
+                            </td>
+                        </tr>
+                        <tr th:if="${#lists.isEmpty(page.records)}">
+                            <td class="text-center py-4 text-muted" colspan="6">暂无数据，快去记一笔吧~</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- 👇 新增：分页控件 (放在 table-responsive 后面) -->
+                <div class="card-footer bg-white" th:if="${page.pages > 0}">
+                    <nav aria-label="Page navigation">
+                        <ul class="pagination justify-content-center mb-0">
+                            <!-- 上一页 -->
+                            <li class="page-item" th:classappend="${page.current == 1} ? 'disabled'">
+                                <a class="page-link"
+                                   th:href="@{/index(pageNum=${page.current - 1}, categoryId=${param.categoryId}, startDate=${param.startDate}, endDate=${param.endDate})}">
+                                    <i class="fas fa-chevron-left"></i>
+                                </a>
+                            </li>
+
+                            <!-- 当前页/总页数 -->
+                            <li class="page-item disabled">
+                                <span class="page-link text-dark"
+                                      th:text="'第 ' + ${page.current} + ' / ' + ${page.pages} + ' 页'"></span>
+                            </li>
+
+                            <!-- 下一页 -->
+                            <li class="page-item" th:classappend="${page.current == page.pages} ? 'disabled'">
+                                <a class="page-link"
+                                   th:href="@{/index(pageNum=${page.current + 1}, categoryId=${param.categoryId}, startDate=${param.startDate}, endDate=${param.endDate})}">
+                                    <i class="fas fa-chevron-right"></i>
+                                </a>
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 新增账单弹窗 -->
+<div class="modal fade" id="addBillModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="modalTitle">记一笔</h5>
+                <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+            </div>
+            <form action="/bill/save" id="billForm" method="post">
+                <div class="modal-body">
+                    <!-- 隐藏 ID 字段 -->
+                    <input name="id" type="hidden">
+
+                    <div class="mb-3">
+                        <label class="form-label">收支类型</label>
+                        <select class="form-select" name="type" required>
+                            <option value="2">支出</option>
+                            <option value="1">收入</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">金额</label>
+                        <input class="form-control" id="amountInput" name="amount" required step="0.01" type="number">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">分类</label>
+
+                        <!-- 替换：添加账单时的分类选择，改为图标按钮（必选） -->
+                        <input id="addBillCategoryId" name="categoryId" type="hidden"/>
+                        <div class="category-grid">
+                            <button class="cat-btn" th:attr="data-id=${c.id}" th:each="c : ${categories}"
+                                    th:onclick="|selectAddCategory(${c.id}, this)|"
+                                    type="button">
+                                <i class="fas icon"></i>
+                                <span class="label" th:text="${c.name}">分类</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">日期</label>
+                        <input class="form-control" name="billDate" required type="date">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">备注</label>
+                        <input class="form-control" name="remark" type="text">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-secondary" data-bs-dismiss="modal" type="button">取消</button>
+                    <button class="btn btn-primary" type="submit">保存</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+
+<!-- 👇 新增：计算器弹窗 -->
+<div class="modal fade" id="calcModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content bg-light">
+            <div class="modal-header border-0 pb-0">
+                <h6 class="modal-title"><i class="fas fa-calculator text-secondary me-2"></i>计算器</h6>
+                <button class="btn-close" data-bs-dismiss="modal" type="button"></button>
+            </div>
+            <div class="modal-body">
+                <div class="calc-display" id="calcDisplay">0</div>
+                <div class="row g-2">
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('7')">7</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('8')">8</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('9')">9</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-secondary bg-gradient calc-btn border-0" onclick="calcInput('/')">÷
+                        </button>
+                    </div>
+
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('4')">4</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('5')">5</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('6')">6</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-secondary bg-gradient calc-btn border-0" onclick="calcInput('*')">×
+                        </button>
+                    </div>
+
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('1')">1</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('2')">2</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('3')">3</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-secondary bg-gradient calc-btn border-0" onclick="calcInput('-')">-
+                        </button>
+                    </div>
+
+                    <div class="col-3">
+                        <button class="btn btn-danger bg-gradient calc-btn border-0" onclick="calcClear()">C</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-white shadow-sm calc-btn" onclick="calcInput('0')">0</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-success bg-gradient calc-btn border-0" onclick="calcResult()">=</button>
+                    </div>
+                    <div class="col-3">
+                        <button class="btn btn-secondary bg-gradient calc-btn border-0" onclick="calcInput('+')">+
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 👇 新增：预算设置弹窗 -->
+<div class="modal fade" id="budgetModal" tabindex="-1">
+    <div class="modal-dialog modal-sm">
+        <div class="modal-content border-0 shadow-lg">
+            <div class="modal-header bg-gradient bg-warning text-white border-0">
+                <h5 class="modal-title"><i class="fas fa-coins me-2"></i>设置月度预算</h5>
+                <button class="btn-close btn-close-white" data-bs-dismiss="modal" type="button"></button>
+            </div>
+            <div class="modal-body py-4">
+                <div class="text-center mb-4">
+                    <div class="bg-warning bg-opacity-10 rounded-circle d-inline-flex p-3">
+                        <i class="fas fa-chart-line fa-2x text-warning"></i>
+                    </div>
+                    <p class="text-muted small mt-2">设置月度预算，合理规划您的开支</p>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold"><i
+                            class="far fa-calendar-alt me-1 text-secondary"></i>月份</label>
+                    <input class="form-control form-control-lg" id="budgetMonth" required type="month">
+                </div>
+                <div class="mb-4">
+                    <label class="form-label fw-bold"><i class="fas fa-money-bill-wave me-1 text-secondary"></i>预算金额</label>
+                    <div class="input-group input-group-lg">
+                        <span class="input-group-text bg-light border-end-0">¥</span>
+                        <input class="form-control border-start-0" id="budgetAmount" min="0" placeholder="0.00"
+                               required step="0.01" type="number">
+                    </div>
+                    <div class="form-text text-muted small">建议根据上月支出情况设置合理预算</div>
+                </div>
+            </div>
+            <div class="modal-footer border-0 bg-light">
+                <button class="btn btn-outline-secondary px-4" data-bs-dismiss="modal" type="button">取消</button>
+                <button class="btn btn-warning px-4 shadow-sm" onclick="saveBudget()" type="button">
+                    <i class="fas fa-save me-1"></i>保存预算
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ============ AI 智能助手组件 ============ -->
+
+<!-- 1. 悬浮按钮 (Hanabi) -->
+<div class="bot-container" onclick="toggleChat()">
+    <div class="chat-bubble">点我帮你分析账单! ✨</div>
+    <!-- 修正图片路径引用: 确保使用了 @{} 语法，并且路径以 / 开头 -->
+    <img alt="Hanabi" class="bot-avatar" onerror="this.src='https://via.placeholder.com/150?text=Hanabi'"
+         th:src="@{/images/hanabi.jpg}">
+</div>
+
+<!-- 2. 聊天窗口 -->
+<div class="chat-window" id="chatWindow">
+    <div class="chat-header">
+        <!-- 修改标题 -->
+        <span>🧨 花火智能理财助手</span>
+        <button class="btn-close btn-close-white" onclick="toggleChat()" type="button"></button>
+    </div>
+    <div class="chat-body" id="chatBody">
+        <div class="message bot">
+            <div class="bubble">你好！我是你的花火财务助手 🎆。<br>你可以上传 Excel 账单让我分析，或者直接问我理财建议！
+            </div>
+        </div>
+    </div>
+    <div class="chat-footer">
+        <!-- 隐形文件输入框 -->
+        <input id="fileInput" onchange="uploadFile()" style="display: none" type="file">
+        <button class="btn btn-outline-secondary btn-sm" onclick="document.getElementById('fileInput').click()"
+                title="上传文件">
+            <i class="fas fa-paperclip"></i>
+        </button>
+        <input class="form-control" id="chatInput" onkeypress="if(event.keyCode==13) sendMsg()" placeholder="输入问题..."
+               type="text">
+        <button class="btn btn-primary" onclick="sendMsg()"><i class="fas fa-paper-plane"></i></button>
+    </div>
+    <div class="text-center p-1 bg-white border-top">
+        <small class="text-muted" onclick="clearHistory()" style="cursor: pointer;">🗑️ 清除记忆</small>
+    </div>
+</div>
+
+<!-- ============ JavaScript 逻辑 ============ -->
+<script>
+    const chatBody = document.getElementById('chatBody');
+    const chatInput = document.getElementById('chatInput');
+    const chatWindow = document.getElementById('chatWindow');
+
+    // 👇 恢复聊天窗口状态
+    (function restoreChatState() {
+        const isVisible = sessionStorage.getItem('chatVisible') === 'true';
+        const history = sessionStorage.getItem('chatHistory');
+
+        if (history) {
+            chatBody.innerHTML = history;
+            setTimeout(scrollToBottom, 100);
+        }
+
+        if (isVisible) {
+            chatWindow.style.display = 'flex';
+        }
+
+        // 清除状态，避免意外干扰下次正常进入
+        sessionStorage.removeItem('chatVisible');
+        sessionStorage.removeItem('chatHistory');
+    })();
+
+    // 👇 保存聊天窗口状态
+    function saveChatState() {
+        const isVisible = chatWindow.style.display === 'flex';
+        sessionStorage.setItem('chatVisible', isVisible);
+        sessionStorage.setItem('chatHistory', chatBody.innerHTML);
+    }
+
+    // 1. 开关聊天窗
+    function toggleChat() {
+        chatWindow.style.display = (chatWindow.style.display === 'none' || chatWindow.style.display === '') ? 'flex' : 'none';
+        if (chatWindow.style.display === 'flex') chatInput.focus();
+    }
+
+    // 🟢 复用模态框逻辑
+    let billModalInstance = null;
+
+    function getBillModal() {
+        if (!billModalInstance) {
+            billModalInstance = new bootstrap.Modal(document.getElementById('addBillModal'));
+        }
+        return billModalInstance;
+    }
+
+    // 打开新增窗口
+    function openAddModal() {
+        document.getElementById('modalTitle').innerText = '记一笔';
+        document.querySelector('#addBillModal form').reset();
+        document.querySelector('[name="id"]').value = '';
+        document.querySelector('[name="billDate"]').value = new Date().toISOString().split('T')[0];
+        getBillModal().show();
+    }
+
+    // 打开编辑窗口
+    function editBill(id, type, amount, categoryId, date, remark) {
+        document.getElementById('modalTitle').innerText = '编辑账单';
+        document.querySelector('[name="id"]').value = id;
+        document.querySelector('[name="type"]').value = type;
+        document.querySelector('[name="amount"]').value = amount;
+        document.querySelector('[name="categoryId"]').value = categoryId;
+        document.querySelector('[name="billDate"]').value = date;
+        document.querySelector('[name="remark"]').value = remark === 'null' ? '' : remark;
+        getBillModal().show();
+    }
+
+    // 金额校验功能 - SweetAlert2 优化版
+    document.addEventListener('DOMContentLoaded', function () {
+        const billForm = document.getElementById('billForm');
+        const amountInput = document.getElementById('amountInput');
+        const categorySelect = billForm.querySelector('select[name="categoryId"]');
+
+        // 表单提交事件监听器
+        billForm.addEventListener('submit', function (e) {
+            e.preventDefault(); // 拦截默认提交
+
+            const amount = parseFloat(amountInput.value);
+            const categoryId = categorySelect ? categorySelect.value : null;
+
+            // 1. 检查分类
+            if (categorySelect && (!categoryId || categoryId === "")) {
+                Swal.fire({
+                    icon: 'info',
+                    title: '提示',
+                    text: '请选择账单分类',
+                    confirmButtonText: '好的'
+                });
+                return;
+            }
+
+            // 2. 检查金额是否为负数或0
+            if (isNaN(amount) || amount <= 0) {
+                Swal.fire({
+                    icon: 'error',
+                    title: '错误',
+                    text: '账单金额必须大于0！',
+                    confirmButtonText: '重试'
+                });
+                return;
+            }
+
+            // 3. 检查金额是否超过10000
+            if (amount > 10000) {
+                Swal.fire({
+                    title: '金额较大确认',
+                    html: `您输入的金额为 <b class="text-danger">¥${amount.toFixed(2)}</b><br>确定要保存吗？`,
+                    icon: 'warning',
+                    showCancelButton: true,
+                    confirmButtonColor: '#ef4444',
+                    cancelButtonColor: '#3b82f6',
+                    confirmButtonText: '确定保存',
+                    cancelButtonText: '再检查下'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        billForm.submit();
+                    }
+                });
+                return;
+            }
+
+            // 验证通过，直接提交
+            billForm.submit();
+        });
+    });
+
+    // 配置 marked 选项以支持表格和换行
+    marked.setOptions({
+        gfm: true,
+        breaks: true, // 允许回车换行
+        headerIds: false, // 简化渲染
+        highlight: function (code, lang) {
+            const language = hljs.getLanguage(lang) ? lang : 'plaintext';
+            return hljs.highlight(code, {language}).value;
+        }
+    });
+
+    // ------------- 新增分类按钮交互 -------------
+    // 根据 data-id 填充图标（避免复杂的 Thymeleaf 三元表达式）
+    function hydrateCategoryIcons() {
+        const map = {
+            '1': 'fa-wallet',
+            '2': 'fa-gift',
+            '3': 'fa-utensils',
+            '4': 'fa-bus',
+            '5': 'fa-shopping-bag',
+            '6': 'fa-home'
+        };
+        document.querySelectorAll('.category-grid .cat-btn').forEach(btn => {
+            const id = btn.getAttribute('data-id');
+            const iconEl = btn.querySelector('.icon');
+            if (iconEl) {
+                // 如果按钮本身没有 data-id (例如“全部”)，跳过
+                if (id && map[id]) {
+                    iconEl.classList.add(map[id]);
+                }
+            }
+        });
+    }
+
+    function selectFilterCategory(id, el) {
+        // 设置隐藏的 filter input
+        document.getElementById('filterCategoryId').value = id === '' ? '' : id;
+        // 切换样式
+        const group = document.getElementById('filterCategoryGrid');
+        group.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        if (el) el.classList.add('active');
+    }
+
+    function selectAddCategory(id, el) {
+        document.getElementById('addBillCategoryId').value = id;
+        // 切换样式
+        const group = el.closest('.category-grid');
+        group.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+        el.classList.add('active');
+    }
+
+    // 在添加账单表单提交前校验是否选择了分类
+    document.addEventListener('DOMContentLoaded', function () {
+        // 填充图标
+        hydrateCategoryIcons();
+        const addBillForm = document.querySelector('#addBillModal form');
+        if (addBillForm) {
+            addBillForm.addEventListener('submit', function (e) {
+                const v = document.getElementById('addBillCategoryId').value;
+                if (!v) {
+                    e.preventDefault();
+                    alert('请选择分类');
+                    // 给第一个按钮一个焦点提示
+                    const firstBtn = document.querySelector('#addBillModal .category-grid .cat-btn');
+                    if (firstBtn) firstBtn.scrollIntoView({behavior: 'smooth', block: 'center'});
+                    return false;
+                }
+            });
+        }
+
+        // 如果 filter 已由后端渲染选中，则确保前端样式与隐藏输入一致（双保险）
+        const filterVal = document.getElementById('filterCategoryId') ? document.getElementById('filterCategoryId').value : '';
+        if (filterVal !== null) {
+            const group = document.getElementById('filterCategoryGrid');
+            if (group) {
+                group.querySelectorAll('.cat-btn').forEach(b => b.classList.remove('active'));
+                if (filterVal === '' || filterVal === 'null') {
+                    const allBtn = group.querySelector('.cat-btn');
+                    if (allBtn) allBtn.classList.add('active');
+                } else {
+                    // 直接通过 data-id 查找（更稳健）
+                    const target = group.querySelector(".cat-btn[data-id='" + filterVal + "']");
+                    if (target) target.classList.add('active');
+                }
+            }
+        }
+    });
+    // ------------- 结束 分类按钮交互 -------------
+
+    // 2. 发送消息
+    window.hasAutoReloaded = false; // 防止重复刷新标志
+
+    function sendMsg() {
+        const text = chatInput.value.trim();
+        if (!text) return;
+
+        // 添加用户消息
+        addMessage(text, 'user');
+        chatInput.value = '';
+
+        // 创建 Bot 消息
+        const thinkingId = 'thinking-' + Date.now();
+        const thinkingHtml = `
+            <div class="typing-indicator" id="${thinkingId}">
+                <span></span><span></span><span></span>
+            </div>`;
+
+        const botBubble = addMessage(thinkingHtml, 'bot');
+
+        // 👇 核心逻辑1：开始思考，添加彩虹背景
+        botBubble.classList.add('thinking');
+
+        let fullText = "";
+        let isFirstToken = true;
+
+        // SSE 流式请求
+        const eventSource = new EventSource(`/ai/chat?message=${encodeURIComponent(text)}`);
+
+        // 监听自定义事件，强制刷新
+        eventSource.addEventListener('magic', function (event) {
+            if (!window.hasAutoReloaded) {
+                window.hasAutoReloaded = true;
+                const reloadMsg = document.createElement('div');
+                reloadMsg.className = 'alert alert-success mt-2 mb-0 p-2 small';
+                reloadMsg.innerHTML = '<i class="fas fa-sync fa-spin me-1"></i> 系统指令：正在刷新数据...';
+                botBubble.appendChild(reloadMsg);
+
+                // 保存状态后刷新
+                saveChatState();
+                setTimeout(() => window.location.reload(), 1000);
+            }
+        });
+
+        eventSource.onmessage = function (event) {
+            const delta = event.data.replace(/<br_mark>/g, '\n');
+            // 👇 核心修复：更严格的判定
+            // 只有当 delta 包含可见字符时，才认为思考结束。
+            // 这样可以忽略开头的空数据包或纯换行符，防止气泡提前塌陷。
+            if (isFirstToken && (!delta || delta.trim().length === 0)) {
+                return;
+            }
+
+            // 👇 核心逻辑2：收到真正文字 -> 移除动画节点 -> 移除彩虹背景
+            if (isFirstToken) {
+                const indicator = document.getElementById(thinkingId);
+                if (indicator) indicator.remove();
+
+                // 瞬间去掉 .thinking 类，恢复默认颜色
+                botBubble.classList.remove('thinking');
+
+                // 恢复 display 属性，以便 markdown 内容正常排版（否则 flex 会打乱表格布局）
+                botBubble.style.display = 'inline-block';
+
+                isFirstToken = false;
+            }
+
+            fullText += delta;
+// 🟢 新增逻辑：智能检测是否需要刷新页面
+            if (fullText.includes("系统已自动写入数据库") && !window.hasAutoReloaded) {
+                window.hasAutoReloaded = true;
+                setTimeout(() => {
+                    const reloadMsg = document.createElement('div');
+                    reloadMsg.className = 'alert alert-success mt-2 mb-0 p-2 small';
+                    reloadMsg.innerHTML = '<i class="fas fa-sync fa-spin me-1"></i> 检测到数据更新，正在刷新页面...';
+                    botBubble.appendChild(reloadMsg);
+
+                    // 保存状态后刷新
+                    saveChatState();
+                    setTimeout(() => window.location.reload(), 1500);
+                }, 1000);
+            }
+            // 下面的逻辑保持之前的 Markdown 修复逻辑
+            let fixFormatText = fullText;
+            fixFormatText = fixFormatText.replace(/(^|\n)(#{1,6})([^\s#])/g, '$1$2 $3');
+            fixFormatText = fixFormatText.replace(/([^\n])(\n#{1,6}\s)/g, '$1\n\n$2');
+
+            botBubble.innerHTML = marked.parse(fixFormatText);
+
+            // 高亮代码块
+            botBubble.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+            scrollToBottom();
+        };
+
+        eventSource.onerror = function () {
+            eventSource.close();
+            if (isFirstToken) {
+                botBubble.classList.remove('thinking');
+                botBubble.style.display = 'inline-block';
+                botBubble.innerHTML = "<span class='text-danger'>连接超时或网络错误 🤯</span>";
+            }
+        };
+    }
+
+    // 3. 上传文件
+    function uploadFile() {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        const formData = new FormData();
+        formData.append("file", file);
+
+        // 添加一个正在上传的提示
+        const loadingBubble = addMessage(`📄 正在解析文件: ${file.name}...`, 'user');
+
+        fetch('/ai/upload', {
+            method: 'POST',
+            body: formData
+        })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    loadingBubble.innerText = "❌ 上传失败: " + data.error;
+                } else {
+                    loadingBubble.innerText = `📄 已上传文件 [${data.fileName}]`;
+                    // 将文件内容填入输入框，让用户决定什么时候发送
+                    chatInput.value = data.content;
+                    chatInput.focus();
+                }
+            })
+            .catch(err => {
+                loadingBubble.innerText = "❌ 网络错误";
+            });
+
+        fileInput.value = ''; // 重置
+    }
+
+    // 4. 通用工具
+    function addMessage(htmlContent, role) {
+        const msgDiv = document.createElement('div');
+        msgDiv.className = `message ${role}`;
+        msgDiv.innerHTML = `<div class="bubble">${htmlContent}</div>`;
+        chatBody.appendChild(msgDiv);
+        scrollToBottom();
+        return msgDiv.querySelector('.bubble');
+    }
+
+    function scrollToBottom() {
+        chatBody.scrollTop = chatBody.scrollHeight;
+    }
+
+    function clearHistory() {
+        fetch('/ai/clear', {method: 'POST'}).then(() => {
+            chatBody.innerHTML = '<div class="message bot"><div class="bubble">记忆已清除 🧠</div></div>';
+        });
+    }
+
+    // 🆕 新增：生成随机账单
+    function generateBills() {
+        const count = document.getElementById('genCount').value;
+        if (confirm(`确定要随机生成 ${count} 笔模拟账单吗？`)) {
+            fetch('/bill/generate?count=' + count, {method: 'POST'})
+                .then(() => {
+                    // 👇 修改提示语，解释分页情况
+                    alert(`成功生成 ${count} 笔账单！\n\n提示：\n列表默认仅显示【最新10条】。\n请翻页或调整查询日期查看全部数据。`);
+                    // 保存状态后刷新
+                    saveChatState();
+                    window.location.reload();
+                });
+        }
+    }
+
+    // 🆕 新增：清空所有账单
+    function clearBills() {
+        if (confirm('⚠️ 警告：这将清空您所有的记账数据，且不可恢复！\n确定要清空吗？')) {
+            fetch('/bill/clear', {method: 'POST'})
+                .then(() => {
+                    alert('数据已清空。');
+                    // 保存状态后刷新
+                    saveChatState();
+                    window.location.reload();
+                });
+        }
+    }
+
+    // 🆕 新增：财务健康体检
+    function checkHealth() {
+        const content = document.getElementById('healthContent');
+        const loading = document.getElementById('healthLoading');
+
+        content.style.display = 'none';
+        loading.style.display = 'block';
+
+        // 模拟计算延迟感
+        setTimeout(() => {
+            fetch('/bill/health')
+                .then(res => res.json())
+                .then(data => {
+                    loading.style.display = 'none';
+                    content.style.display = 'block';
+
+                    let colorClass = data.type === 'danger' ? 'text-danger' : (data.type === 'success' ? 'text-success' : 'text-warning');
+
+                    content.innerHTML = `
+                    <div class="display-6 mb-2">${data.score}</div>
+                    <div class="fw-bold ${colorClass} mb-2">${data.score.split(" ")[1] || data.score}</div>
+                    <p class="small text-muted border-top pt-2">${data.advice}</p>
+                `;
+                });
+        }, 800);
+    }
+
+    // 🆕 新增：计算器逻辑
+    let calcExpression = "0";
+    let shouldReset = false; // 计算完后是否重置
+
+    function calcInput(val) {
+        if (shouldReset && !['+', '-', '*', '/'].includes(val)) {
+            calcExpression = "0";
+            shouldReset = false;
+        }
+        if (shouldReset && ['+', '-', '*', '/'].includes(val)) {
+            shouldReset = false; // 继续运算
+        }
+
+        if (calcExpression === "0" && !['+', '-', '*', '/'].includes(val)) {
+            calcExpression = val;
+        } else {
+            calcExpression += val;
+        }
+        updateDisplay();
+    }
+
+    function calcClear() {
+        calcExpression = "0";
+        shouldReset = false;
+        updateDisplay();
+    }
+
+    function calcResult() {
+        try {
+            // 安全性注意：eval在前端计算器场景通常可接受，但需注意
+            // 这里简单处理，实际可使用 Math.js 库
+            let result = eval(calcExpression);
+            // 处理浮点数精度
+            if (!Number.isInteger(result)) {
+                result = parseFloat(result.toFixed(2));
+            }
+            calcExpression = result.toString();
+            shouldReset = true;
+            updateDisplay();
+        } catch (e) {
+            calcExpression = "Error";
+            shouldReset = true;
+            updateDisplay();
+        }
+    }
+
+    function updateDisplay() {
+        const display = document.getElementById('calcDisplay');
+        display.innerText = calcExpression;
+        // 自动滚动到最右侧
+        display.scrollLeft = display.scrollWidth;
+    }
+
+    // 🆕 新增：预算设置逻辑
+    let budgetModalInstance = null;
+
+    function getBudgetModal() {
+        if (!budgetModalInstance) {
+            budgetModalInstance = new bootstrap.Modal(document.getElementById('budgetModal'));
+        }
+        return budgetModalInstance;
+    }
+
+    function openBudgetModal() {
+        // 默认显示当前月
+        const now = new Date();
+        const monthStr = now.toISOString().slice(0, 7); // yyyy-MM
+        document.getElementById('budgetMonth').value = monthStr;
+        document.getElementById('budgetAmount').value = '';
+        getBudgetModal().show();
+    }
+
+    function saveBudget() {
+        const month = document.getElementById('budgetMonth').value;
+        const amount = document.getElementById('budgetAmount').value;
+
+        if (!month || !amount) {
+            alert("请填写完整信息");
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append("month", month);
+        formData.append("amount", amount);
+
+        fetch('/budget/ajax/save', {
+            method: 'POST',
+            body: formData
+        })
+            .then(res => res.text())
+            .then(txt => {
+                if (txt === 'ok') {
+                    alert("预算设置成功！");
+                    getBudgetModal().hide();
+                    // 刷新页面以显示最新预算信息
+                    window.location.reload();
+                } else {
+                    alert("设置失败：" + txt);
+                }
+            })
+            .catch(err => {
+                alert("网络错误：" + err);
+            });
+    }
+</script>
+
+<!-- Bootstrap JavaScript 库（必须加载才能使用模态框功能）-->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
