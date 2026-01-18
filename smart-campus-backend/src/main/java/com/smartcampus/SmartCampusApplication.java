@@ -32,7 +32,7 @@ public class SmartCampusApplication {
     /**
      * 启动时生成符合课表规律的模拟数据
      */
-    @Bean
+    /*@Bean
     public CommandLineRunner dataInitializer(VisualStatsLogService visualStatsLogService,
             com.smartcampus.service.SysClassroomService sysClassroomService) {
         return args -> {
@@ -103,11 +103,12 @@ public class SmartCampusApplication {
                     allLogs.add(log);
                 }
             }
+        }
 
-            visualStatsLogService.saveBatch(allLogs);
-            System.out.println("模拟数据生成完成，共为 5 个教室生成 " + allLogs.size() + " 条记录");
+        visualStatsLogService.saveBatch(allLogs);
+        System.out.println("模拟数据生成完成，共为 5 个教室生成 " + allLogs.size() + " 条记录");
         };
-    }
+    }*/
 
     /**
      * 判断指定时间是否在上课时间段内

@@ -11,4 +11,10 @@ import org.springframework.stereotype.Service;
  */
 @Service
 public class VisualStatsLogServiceImpl extends ServiceImpl<VisualStatsLogMapper, VisualStatsLog> implements VisualStatsLogService {
+    
+    @Override
+    public Integer getCurrentPersonCount(Long roomId) {
+        // 调用mapper获取最新的人数记录
+        return baseMapper.selectLatestPersonCount(roomId);
+    }
 }

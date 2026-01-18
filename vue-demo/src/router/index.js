@@ -21,6 +21,12 @@ const router = createRouter({
       component: () => import('../views/DashboardView.vue'),
       meta: { title: '教室状态实时看板' }
     },
+    {
+      path: '/lost-found',
+      name: 'lost-found',
+      component: () => import('../views/LostFound.vue'),
+      meta: { title: '失物招领智能辅助' }
+    },
     
     {
       path: '/accounting',
@@ -105,7 +111,16 @@ router.beforeEach(async (to, from, next) => {
   // 首先检查 localStorage，如果存在 currentUser 则认为已登录
   try {
     const cached = localStorage.getItem('currentUser')
-    if (cached) return next()
+    if (cached) {
+      try {
+        // 验证缓存的用户信息是否有效
+        await getCurrentUser()
+        return next()
+      } catch (e) {
+        // 缓存无效，清除并跳转到登录页
+        localStorage.removeItem('currentUser')
+      }
+    }
   } catch (e) {}
 
   try {

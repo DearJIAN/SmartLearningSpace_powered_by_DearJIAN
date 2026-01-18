@@ -192,23 +192,40 @@ const updateCharts = (data) => {
       formatter: '{b}: ¥{c} ({d}%)' 
     },
     legend: {
-      orient: 'vertical',
-      right: '5%',
-      top: 'center',
-      textStyle: { color: '#64748b', fontSize: 11 }
+      orient: 'horizontal', // 改为水平方向
+      bottom: '10%', // 放在底部
+      top: 'auto',
+      left: 'center', // 居中对齐
+      itemWidth: 12,
+      itemHeight: 12,
+      itemGap: 16,
+      textStyle: { color: '#64748b', fontSize: 11 },
+      formatter: '{name}',
+      type: 'scroll' // 支持滚动，防止图例过多时溢出
     },
     series: [{
       type: 'pie', 
-      radius: ['35%', '60%'], 
-      center: ['40%', '50%'],
+      radius: ['40%', '65%'], // 调整饼图大小
+      center: ['50%', '40%'], // 居中显示
       avoidLabelOverlap: true,
       itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
       label: { 
         show: true, 
         position: 'outside',
-        formatter: '{b}',
+        formatter: '{b}: {d}%',
         fontSize: 10,
-        color: '#64748b'
+        color: '#64748b',
+        // 调整标签布局，避免重叠
+        alignTo: 'none',
+        bleedMargin: 15,
+        lineHeight: 14
+      },
+      labelLine: {
+        show: true,
+        length: 20,
+        length2: 15,
+        smooth: true,
+        lineStyle: { color: '#d1d5db', width: 1 }
       },
       emphasis: {
         label: { show: true, fontSize: 12, fontWeight: 'bold' }

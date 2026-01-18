@@ -35,12 +35,17 @@
           <span>个人记账</span>
         </el-menu-item>
         
+        <el-menu-item index="/lost-found">
+          <el-icon style="color: #f59e0b"><i-tabler-search /></el-icon>
+          <span>失物招领</span>
+        </el-menu-item>
+        
         <el-menu-item index="/analysis" disabled>
           <el-icon style="color: #f87171"><i-tabler-chart-pie /></el-icon>
           <span>数据分析</span>
         </el-menu-item>
 
-        <el-menu-item index="/logout" class="menu-logout" @click="handleSidebarLogout">
+        <el-menu-item index="logout" class="menu-logout" @click="handleSidebarLogout">
           <el-icon style="color: #ef4444"><i-tabler-power /></el-icon>
           <span>退出登录</span>
         </el-menu-item>

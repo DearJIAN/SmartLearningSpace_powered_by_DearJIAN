@@ -13,16 +13,17 @@ spring:
       min-idle: 5
       max-active: 20
       max-wait: 60000
+      validation-query: SELECT 1
+      test-on-borrow: true
   # 自动执行 SQL 初始化脚本配置
   sql:
     init:
-      mode: always
+      mode: never
       platform: mysql
-      # 按顺序执行：先创建 schema，再执行 accounting 脚本
-      schema-locations: file:./sql/schema.sql,file:./sql/accounting_schema.sql
+      # 按顺序执行：先创建 schema，再执行 accounting 和 lost found 脚本
+      schema-locations: file:./sql/schema.sql,file:./sql/accounting_schema.sql,file:./sql/lost_found_table.sql
 
 mybatis-plus:
-  mapper-locations: classpath:mapper/*.xml
   configuration:
     map-underscore-to-camel-case: true
     log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

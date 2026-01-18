@@ -58,7 +58,7 @@
         <div class="foot">
           <span v-if="isLogin">还没有账号？</span>
           <span v-else>已有账户？</span>
-          <el-button type="text" @click="isLogin = !isLogin">{{ isLogin ? '立即注册' : '去登录' }}</el-button>
+          <el-button link @click="isLogin = !isLogin">{{ isLogin ? '立即注册' : '去登录' }}</el-button>
         </div>
       </div>
     </div>
