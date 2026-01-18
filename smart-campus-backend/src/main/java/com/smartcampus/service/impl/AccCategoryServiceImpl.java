@@ -40,8 +40,8 @@ public class AccCategoryServiceImpl extends ServiceImpl<AccCategoryMapper, AccCa
 
     @Override
     public void initDefaultCategories(Long userId) {
-        // 创建默认收入分类
-        String[] incomeCategories = { "工资", "奖金", "投资收益", "其他收入" };
+        // 创建默认收入分类 (大学生版)
+        String[] incomeCategories = { "奖学金", "理财收益", "兼职收入", "生活费", "其他收入" };
         for (String name : incomeCategories) {
             AccCategory category = new AccCategory();
             category.setUserId(userId);
@@ -50,8 +50,11 @@ public class AccCategoryServiceImpl extends ServiceImpl<AccCategoryMapper, AccCa
             this.save(category);
         }
 
-        // 创建默认支出分类
-        String[] expenseCategories = { "餐饮美食", "购物消费", "交通出行", "生活缴费", "娱乐休闲", "医疗健康", "学习教育", "其他支出" };
+        // 创建默认支出分类 (大学生版)
+        String[] expenseCategories = {
+                "餐饮美食", "服饰美容", "交通出行", "娱乐休闲", "生活日用",
+                "住宿租赁", "学术学习", "医疗健康", "人情往来", "其他杂项"
+        };
         for (String name : expenseCategories) {
             AccCategory category = new AccCategory();
             category.setUserId(userId);

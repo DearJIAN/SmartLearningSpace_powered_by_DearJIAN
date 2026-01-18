@@ -88,11 +88,11 @@ public class AccSetupController {
 
             if (count != null && count == 0) {
                 String insertData = "INSERT INTO `acc_category` (`name`, `type`, `user_id`) VALUES " +
-                        "('工资薪金', 1, NULL), ('兼职收入', 1, NULL), ('理财收益', 1, NULL), ('礼金红包', 1, NULL), ('其他收入', 1, NULL),"
+                        "('奖学金', 1, NULL), ('理财收益', 1, NULL), ('兼职收入', 1, NULL), ('生活费', 1, NULL), ('其他收入', 1, NULL),"
                         +
-                        "('餐饮美食', 2, NULL), ('交通出行', 2, NULL), ('服饰美容', 2, NULL), ('日用百货', 2, NULL), ('休闲娱乐', 2, NULL),"
+                        "('餐饮美食', 2, NULL), ('服饰美容', 2, NULL), ('交通出行', 2, NULL), ('娱乐休闲', 2, NULL), ('生活日用', 2, NULL),"
                         +
-                        "('学习进修', 2, NULL), ('医疗健康', 2, NULL), ('住房物业', 2, NULL), ('水电煤气', 2, NULL), ('人情往来', 2, NULL);";
+                        "('住宿租赁', 2, NULL), ('学术学习', 2, NULL), ('医疗健康', 2, NULL), ('人情往来', 2, NULL), ('其他杂项', 2, NULL);";
                 jdbcTemplate.execute(insertData);
             }
 
@@ -100,6 +100,28 @@ public class AccSetupController {
         } catch (Exception e) {
             e.printStackTrace();
             return Result.error("Initialization failed: " + e.getMessage());
+        }
+    }
+
+    @GetMapping("/reset-categories")
+    public Result<String> resetCategories() {
+        try {
+            // 1. Clear all categories (System + User)
+            jdbcTemplate.execute("TRUNCATE TABLE acc_category");
+
+            // 2. Insert new System Default Categories
+            String insertData = "INSERT INTO `acc_category` (`name`, `type`, `user_id`) VALUES " +
+                    "('奖学金', 1, NULL), ('理财收益', 1, NULL), ('兼职收入', 1, NULL), ('生活费', 1, NULL), ('其他收入', 1, NULL),"
+                    +
+                    "('餐饮美食', 2, NULL), ('服饰美容', 2, NULL), ('交通出行', 2, NULL), ('娱乐休闲', 2, NULL), ('生活日用', 2, NULL),"
+                    +
+                    "('住宿租赁', 2, NULL), ('学术学习', 2, NULL), ('医疗健康', 2, NULL), ('人情往来', 2, NULL), ('其他杂项', 2, NULL);";
+            jdbcTemplate.execute(insertData);
+
+            return Result.success("Categories reset successfully! Old categories deleted.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            return Result.error("Reset failed: " + e.getMessage());
         }
     }
 }

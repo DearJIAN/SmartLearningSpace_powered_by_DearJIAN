@@ -5,7 +5,7 @@
       <el-aside width="220px" class="side-nav">
         <div class="side-nav-header">
           <div class="icon-box">
-            <el-icon><Wallet /></el-icon>
+            <el-icon style="color: #fbbf24"><i-ph-wallet-duotone /></el-icon>
           </div>
           <div class="header-text">
             <h3>记账助手</h3>
@@ -19,57 +19,57 @@
           class="elegant-menu"
         >
           <el-menu-item index="/accounting/bills">
-            <el-icon><List /></el-icon>
+            <el-icon style="color: #3b82f6"><i-ph-receipt-duotone /></el-icon>
             <span>账单明细</span>
           </el-menu-item>
           
           <el-menu-item index="/accounting/analysis">
-            <el-icon><DataLine /></el-icon>
+            <el-icon style="color: #f43f5e"><i-ph-chart-pie-slice-duotone /></el-icon>
             <span>统计报表</span>
           </el-menu-item>
           
           <el-menu-item index="/accounting/calendar">
-            <el-icon><Calendar /></el-icon>
+            <el-icon style="color: #10b981"><i-ph-calendar-blank-duotone /></el-icon>
             <span>账单日历</span>
           </el-menu-item>
           
           <el-menu-item index="/accounting/budget">
-            <el-icon><Money /></el-icon>
+            <el-icon style="color: #6366f1"><i-ph-coin-vertical-duotone /></el-icon>
             <span>预算管理</span>
           </el-menu-item>
 
           <el-menu-item index="/accounting/treemap">
-            <el-icon><Histogram /></el-icon>
+            <el-icon style="color: #8b5cf6"><i-ph-arrows-left-right-duotone /></el-icon>
             <span>资金流向</span>
           </el-menu-item>
 
           <el-menu-item index="/accounting/chat">
-            <el-icon><ChatDotRound /></el-icon>
+            <el-icon style="color: #a78bfa"><i-ph-robot-duotone /></el-icon>
             <span>AI 智能助手</span>
           </el-menu-item>
 
           <el-sub-menu index="insight">
             <template #title>
-              <el-icon><Opportunity /></el-icon>
+              <el-icon style="color: #f59e0b"><i-ph-lightbulb-duotone /></el-icon>
               <span>洞察中心</span>
             </template>
             <el-menu-item index="/accounting/insight/dashboard">
-              <el-icon><View /></el-icon>数据总览
+              <el-icon style="color: #0ea5e9"><i-ph-eye-duotone /></el-icon>数据总览
             </el-menu-item>
             <el-menu-item index="/accounting/insight/goal">
-              <el-icon><Flag /></el-icon>财务目标
+              <el-icon style="color: #ef4444"><i-ph-flag-duotone /></el-icon>财务目标
             </el-menu-item>
             <el-menu-item index="/accounting/insight/profile">
-              <el-icon><User /></el-icon>用户画像
+              <el-icon style="color: #d946ef"><i-ph-user-focus-duotone /></el-icon>用户画像
             </el-menu-item>
             <el-menu-item index="/accounting/insight/risk">
-              <el-icon><WarnTriangleFilled /></el-icon>风险预警
+              <el-icon style="color: #f97316"><i-ph-warning-duotone /></el-icon>风险预警
             </el-menu-item>
           </el-sub-menu>
 
           <div class="menu-footer">
             <el-button link class="logout-btn" @click="handleLogout">
-              <el-icon><SwitchButton /></el-icon> 退出系统
+              <el-icon style="color: #ef4444"><i-ph-power-duotone /></el-icon> 退出系统
             </el-button>
           </div>
         </el-menu>
@@ -91,11 +91,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessageBox } from 'element-plus'
-import { 
-  List, DataLine, Calendar, Money, Histogram, 
-  Opportunity, View, Flag, User, WarnTriangleFilled,
-  SwitchButton, ChatDotRound, Wallet
-} from '@element-plus/icons-vue'
+
 import { getCurrentUser, logout } from '@/api/accounting'
 
 const router = useRouter()

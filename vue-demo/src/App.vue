@@ -16,27 +16,27 @@
         router
       >
         <el-menu-item index="/">
-          <el-icon><Location /></el-icon>
+          <el-icon style="color: #22d3ee"><i-tabler-map-2 /></el-icon>
           <span>校园空间导航</span>
         </el-menu-item>
 
         <el-menu-item index="/dashboard">
-          <el-icon><Monitor /></el-icon>
+          <el-icon style="color: #a78bfa"><i-tabler-building-broadcast-tower /></el-icon>
           <span>教室状态监控</span>
         </el-menu-item>
         
         <el-menu-item index="/reservation" disabled>
-          <el-icon><Calendar /></el-icon>
+          <el-icon style="color: #34d399"><i-tabler-calendar-event /></el-icon>
           <span>座位预约</span>
         </el-menu-item>
         
         <el-menu-item index="/accounting/login">
-          <el-icon><Wallet /></el-icon>
+          <el-icon style="color: #fbbf24"><i-tabler-wallet /></el-icon>
           <span>个人记账</span>
         </el-menu-item>
         
         <el-menu-item index="/analysis" disabled>
-          <el-icon><PieChart /></el-icon>
+          <el-icon style="color: #f87171"><i-tabler-chart-pie /></el-icon>
           <span>数据分析</span>
         </el-menu-item>
       </el-menu>
@@ -67,7 +67,7 @@
 </template>
 
 <script setup>
-import { Monitor, Calendar, PieChart, Location, Wallet } from '@element-plus/icons-vue'
+// Icons are now auto-imported via unplugin-icons
 </script>
 
 <style>

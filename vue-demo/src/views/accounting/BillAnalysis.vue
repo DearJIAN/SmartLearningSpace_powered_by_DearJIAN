@@ -3,7 +3,7 @@
     <!-- Top Filter Row -->
     <div class="glass-toolbar">
       <div class="title-section">
-        <el-icon class="title-icon"><DataAnalysis /></el-icon>
+        <el-icon class="title-icon" style="color: #6366f1"><i-tabler-report-analytics /></el-icon>
         <h2>财务看板</h2>
         <span class="subtitle">洞察您的收支流向与财务健康度</span>
       </div>
@@ -23,7 +23,9 @@
           <el-button @click="setRange('year')">全年</el-button>
         </el-button-group>
         <el-tooltip content="刷新数据" placement="top">
-          <el-button type="primary" circle :icon="Refresh" @click="fetchData" />
+          <el-button type="primary" circle @click="fetchData">
+            <template #icon><i-tabler-refresh /></template>
+          </el-button>
         </el-tooltip>
       </div>
     </div>
@@ -65,7 +67,7 @@
                   • 记账活跃度 (10%)：近30天内记账的天数分布
                 </div>
               </template>
-              <el-icon style="cursor: help; color: #94a3b8"><QuestionFilled /></el-icon>
+              <el-icon style="cursor: help; color: #94a3b8"><i-tabler-info-circle /></el-icon>
             </el-tooltip>
           </div>
           <div class="health-radar-box">
@@ -117,7 +119,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import * as echarts from 'echarts'
-import { DataAnalysis, Refresh, QuestionFilled } from '@element-plus/icons-vue'
+// import { DataAnalysis, Refresh, QuestionFilled } from '@element-plus/icons-vue' // Removed
 import { getAnalysisData } from '@/api/accounting'
 import dayjs from 'dayjs'
 

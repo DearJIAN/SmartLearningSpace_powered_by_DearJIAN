@@ -3,8 +3,8 @@
     <!-- Chat Header -->
     <div class="chat-header">
       <div class="header-main">
-        <div class="bot-avatar">
-          <el-icon><Service /></el-icon>
+        <div class="bot-avatar" style="background: linear-gradient(135deg, #a78bfa, #8b5cf6);">
+          <el-icon style="font-size: 24px;"><i-tabler-robot /></el-icon>
           <span class="status-dot"></span>
         </div>
         <div class="header-info">
@@ -14,7 +14,7 @@
       </div>
       <div class="header-actions">
         <el-button link @click="clearHistory">
-          <el-icon><Delete /></el-icon> 清空对话
+          <el-icon style="color: #ef4444"><i-tabler-trash /></el-icon> <span style="color: #64748b">清空对话</span>
         </el-button>
       </div>
     </div>
@@ -23,8 +23,8 @@
     <div class="message-stream" ref="streamRef">
       <div v-for="(msg, index) in messages" :key="index" :class="['message-item', msg.role]">
         <div class="avatar">
-          <el-icon v-if="msg.role === 'user'"><User /></el-icon>
-          <el-icon v-else><Service /></el-icon>
+          <el-icon v-if="msg.role === 'user'"><i-tabler-user /></el-icon>
+          <el-icon v-else><i-tabler-robot /></el-icon>
         </div>
         <div class="message-bubble-wrapper">
           <div class="bubble">
@@ -71,7 +71,7 @@
           :disabled="!input.trim() || isStreaming"
           @click="handleSend"
         >
-          <el-icon><Promotion /></el-icon>
+          <el-icon><i-tabler-send /></el-icon>
         </el-button>
       </div>
     </div>
@@ -80,7 +80,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, nextTick } from 'vue'
-import { User, Promotion, Delete, Service } from '@element-plus/icons-vue'
+// import { User, Promotion, Delete, Service } from '@element-plus/icons-vue' // Removed
 import { ElMessage } from 'element-plus'
 import { marked } from 'marked'
 import dompurify from 'dompurify'

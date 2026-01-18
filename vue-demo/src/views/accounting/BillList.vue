@@ -4,7 +4,7 @@
     <el-row :gutter="20" class="stat-row">
       <el-col :span="8">
         <div class="glass-card income">
-          <div class="card-icon"><el-icon><Bottom /></el-icon></div>
+          <div class="card-icon"><el-icon><i-ph-trend-down-duotone /></el-icon></div>
           <div class="card-info">
             <span class="label">本月总收入</span>
             <span class="value">¥{{ stats.income || '0.00' }}</span>
@@ -13,7 +13,7 @@
       </el-col>
       <el-col :span="8">
         <div class="glass-card expense">
-          <div class="card-icon"><el-icon><Top /></el-icon></div>
+          <div class="card-icon"><el-icon><i-ph-trend-up-duotone /></el-icon></div>
           <div class="card-info">
             <span class="label">本月总支出</span>
             <span class="value">¥{{ stats.expense || '0.00' }}</span>
@@ -22,7 +22,7 @@
       </el-col>
       <el-col :span="8">
         <div class="glass-card balance">
-          <div class="card-icon"><el-icon><Wallet /></el-icon></div>
+          <div class="card-icon"><el-icon><i-ph-wallet-duotone /></el-icon></div>
           <div class="card-info">
             <span class="label">当月结余</span>
             <span class="value">¥{{ stats.balance || '0.00' }}</span>
@@ -42,7 +42,7 @@
           end-placeholder="结束日期"
           size="default"
           class="custom-picker"
-          style="width: 500px"
+          style="width: 380px; flex-shrink: 0"
           @change="handleFilter"
         />
         <el-select v-model="filterParams.categoryId" placeholder="全部分类" clearable @change="handleFilter">
@@ -57,15 +57,23 @@
         </el-select>
       </div>
       <div class="btn-group">
-        <el-button type="primary" round :icon="Plus" @click="handleAdd">记一笔</el-button>
+        <el-button type="primary" round @click="handleAdd">
+          <template #icon><i-tabler-plus /></template>记一笔
+        </el-button>
         <el-tooltip content="生成随机账单数据" placement="top">
-          <el-button circle :icon="MagicStick" @click="handleGenerate" />
+          <el-button circle @click="handleGenerate">
+            <template #icon><i-tabler-wand style="color: #8b5cf6" /></template>
+          </el-button>
         </el-tooltip>
         <el-tooltip content="导出账单Excel" placement="top">
-          <el-button circle :icon="Download" @click="handleExport" />
+          <el-button circle @click="handleExport">
+            <template #icon><i-tabler-download style="color: #10b981" /></template>
+          </el-button>
         </el-tooltip>
         <el-tooltip content="刷新列表" placement="top">
-          <el-button circle :icon="Refresh" @click="refreshData" />
+          <el-button circle @click="refreshData">
+            <template #icon><i-tabler-refresh style="color: #3b82f6" /></template>
+          </el-button>
         </el-tooltip>
         <el-button type="danger" link @click="handleClear">清空</el-button>
       </div>
@@ -83,7 +91,7 @@
         <el-table-column prop="billDate" label="交易日期" width="160">
           <template #default="{ row }">
             <div class="date-cell">
-              <el-icon><Calendar /></el-icon>
+              <el-icon><i-tabler-calendar-event /></el-icon>
               <span>{{ row.billDate }}</span>
             </div>
           </template>
@@ -109,8 +117,12 @@
 
         <el-table-column label="操作" width="120" align="right">
           <template #default="{ row }">
-            <el-button link type="primary" :icon="EditPen" @click="handleEdit(row)" />
-            <el-button link type="danger" :icon="Delete" @click="handleDelete(row.id)" />
+            <el-button link type="primary" @click="handleEdit(row)">
+              <template #icon><i-tabler-edit /></template>
+            </el-button>
+            <el-button link type="danger" @click="handleDelete(row.id)">
+              <template #icon><i-tabler-trash /></template>
+            </el-button>
           </template>
         </el-table-column>
 
@@ -194,7 +206,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, MagicStick, Download, Refresh, Calendar, Wallet, Top, Bottom, EditPen, Delete } from '@element-plus/icons-vue'
+// import { Plus, MagicStick, Download, Refresh, Calendar, Wallet, Top, Bottom, EditPen, Delete } from '@element-plus/icons-vue' // Removed
 import { 
   getBillPage, getBillStats, getCategories, 
   saveBill, deleteBill, clearBills, generateBills,

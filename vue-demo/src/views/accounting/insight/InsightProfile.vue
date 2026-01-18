@@ -1,7 +1,10 @@
 <template>
   <div class="profile-container">
     <div class="profile-header">
-      <el-button link icon="ArrowLeft" @click="router.back()">返回洞察总览</el-button>
+      <el-button link @click="router.back()">
+        <template #icon><i-tabler-arrow-left style="color: #6366f1; font-weight: bold" /></template>
+        <span style="color: #6366f1">返回洞察总览</span>
+      </el-button>
       <h2>个人财务画像</h2>
     </div>
 
@@ -61,7 +64,7 @@
       <h3>AI 进阶建议</h3>
       <div class="suggestion-grid">
         <div v-for="(sug, i) in (profileData.suggestions || defaultSuggestions)" :key="i" class="sug-item">
-          <el-icon class="sug-icon"><Check /></el-icon>
+          <el-icon class="sug-icon"><i-tabler-circle-check /></el-icon>
           <p>{{ sug }}</p>
         </div>
       </div>
@@ -72,7 +75,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { ArrowLeft, Check } from '@element-plus/icons-vue'
+// import { ArrowLeft, Check } from '@element-plus/icons-vue' // Removed
 import * as echarts from 'echarts'
 import { getFinancialProfile } from '@/api/accounting'
 
