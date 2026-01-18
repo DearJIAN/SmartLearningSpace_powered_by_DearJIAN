@@ -15,23 +15,27 @@
 
 ## 🛠️ 技术栈
 ### 后端 (Backend)
-- **核心框架**: Java 8 / Spring Boot
-- **数据库组件**: MyBatis-Plus + MySQL
-- **工具类**: Apache POI (Excel 导出), 日期处理
+- **核心框架**: Java 8 / Spring Boot 2.7.18
+- **数据库组件**: MyBatis-Plus 3.5.3.1 + MySQL 8.0
+- **连接池**: Druid 1.2.16
+- **工具类**: Apache POI 5.2.3 (Excel 导出), Lombok
+- **AI集成**: OkHttp 4.10.0 (豆包API)
 - **接口规范**: 典型的 RESTful API，返回格式为 `Result<T>` 对象
 
 ### 前端 (Frontend)
-- **核心框架**: Vue 3 (Composition API / <script setup>)
-- **UI 组件库**: Element Plus
+- **核心框架**: Vue 3.5.26 (Composition API / `<script setup>`)
+- **UI 组件库**: Element Plus 2.13.1
 - **数据可视化**: ECharts 5
-- **日期处理**: Day.js
-- **通信**: Axios
+- **图标系统**: Iconify (Tabler Icons, Material Design Icons, Phosphor Icons)
+- **样式方案**: 玻璃拟态(Glassmorphism) + 渐变色 + 高对比度设计
+- **通信**: Axios 1.13.2
 
 ### AI 视觉识别 (AI Vision)
 - **核心框架**: Python 3.8+ / Flask
-- **目标检测**: YOLO 模型
-- **视频流处理**: OpenCV
-- **AI 对话**: 豆包 API 集成
+- **目标检测**: YOLOv11 模型 (yolo11n.pt, yolo11m.pt, 自定义教室模型)
+- **视频流处理**: OpenCV + 多线程
+- **AI 对话**: 豆包 API 集成 (流式响应)
+- **模型管理**: 支持多模型切换、摄像头/文件双输入源
 
 ## 📂 项目文件结构 (Project Structure)
 
@@ -48,7 +52,7 @@
 - **前端 (`vue-demo`)**:
   - `src/views/`: 核心视图组件
     - `Login.vue`: 企业级单点登录页面
-    - `DashboardView.vue`: 教室状态实时监控看板
+    - `DashboardView.vue`: 教室状态实时监控看板（含YOLO子系统集成）
     - `MapView.vue`: 校园空间导航
     - `LostFound.vue`: 失物招领功能页面
     - `accounting/`: 个人记账与财务洞察模块
@@ -57,17 +61,22 @@
       - `BillAnalysis.vue`: 财务统计报表
       - `BillCalendar.vue`: 账单日历视图
       - `AiChat.vue`: AI智能助手
-  - `src/components/`: 通用组件（FocusTrendChart、FloatingSimulator等）
+  - `src/components/`: 通用组件
+    - `FocusTrendChart.vue`: 专注度趋势图表组件
+    - `FloatingSimulator.vue`: 数据模拟悬浮按钮组件
   - `src/api/`: API接口封装（认证、账单、统计、失物招领等）
   - `src/utils/`: 工具类
   - `src/router/`: 路由配置（含路由守卫）
   
 - **AI 视觉识别 (`my_yolo_web`)**:
   - `app.py`: Flask 主应用
-  - `web_inference.py`: YOLO 检测核心逻辑
+  - `web_inference.py`: YOLO 检测核心逻辑（多线程+锁机制）
   - `ai_api.py`: AI 对话接口
   - `static/`: 静态资源
   - `templates/`: HTML 模板
+  - `models/`: YOLO模型文件 (.pt)
+  - `example/`: 示例视频和图片
+  - `runs/`: 检测结果输出目录
   
 - **失物招领功能**:
   - **核心逻辑**: 基于AI视觉识别的失物检测、认领管理和记录更新
@@ -126,35 +135,43 @@ E:\LEAR-CODE
 
 ### 1. 用户认证系统
 - **核心功能**: 企业级单点登录、注册、登出和当前用户信息获取
-- **实现方式**: 基于JWT的认证机制
+- **实现方式**: 基于JWT的认证机制（架构预留）
 - **API 路径**: `/api/accounting/auth/`
 - **关键特性**: 
   - 支持用户名/密码登录
   - 支持新用户注册
   - 路由守卫保护敏感页面
-  - 登录状态持久化
+  - 登录状态通过localStorage持久化
 
-### 2. 教室状态监控模块
-- **核心功能**: 实时监控教室人数、专注度、设备状态
-- **数据生成**: 启动时自动生成符合课表规律的模拟数据
+### 2. 教室状态监控模块 (DashboardView.vue)
+- **核心功能**: 实时监控教室人数、专注度、设备状态，集成YOLO视觉识别
+- **数据生成**: 启动时自动生成符合课表规律的模拟数据（智能算法）
 - **API 路径**: `/api/classroom/`、`/api/stats/`
 - **关键逻辑**: 
   - 上课时间自动调整人数和专注度阈值
   - 支持按教室ID查询实时数据和历史趋势
   - 提供24小时专注度趋势图表
+  - **悬浮控制面板**: AI视觉入口、数据模拟按钮、YOLO子系统最小化窗口
+  - **YOLO子系统窗口**: 支持拖拽、调整大小、最小化，底部居中显示
+  - **数据模拟按钮**: 紫色渐变背景，橙红色互补色呼吸灯（#ff6b35），使用Tabler图标
+  - **AI视觉按钮**: 蓝色渐变，眼睛图标(i-tabler-eye)，脉冲动画
 
 ### 3. 校园空间导航
-- **核心功能**: 校园地图展示和空间导航
+- **核心功能**: 校园地图展示和空间可视化
 - **实现方式**: 基于静态地图资源的可视化展示
 
 ### 4. AI 视觉识别子系统
 - **核心功能**: 实时视频流目标检测、AI 对话
 - **集成方式**: 前端通过 iframe 嵌入 Flask 应用
-- **API 路径**: `http://localhost:5000/`
+- **API 路径**: `http://localhost:5000/api/`
 - **关键特性**: 
-  - 支持摄像头和本地视频源
-  - 可配置检测模型和参数
-  - 实时返回检测结果和统计数据
+  - 支持摄像头(0)和本地视频/图片双输入源
+  - 可配置检测模型和参数（conf_thres, iou_thres, imgsz）
+  - 实时返回检测结果和统计数据（JSON格式）
+  - **多模型支持**: yolo11n.pt(5.3MB), yolo11m.pt(38.8MB), 自定义教室模型
+  - **结果持久化**: 自动保存检测视频/图片到 `runs/web_exp/`
+  - **流式AI对话**: 豆包API集成，支持实时对话
+  - **线程安全**: 使用Lock机制保证多线程下的数据安全
 
 ### 5. 个人记账与财务洞察模块
 - **财务健康模型**: 计算逻辑位于 `AccBillServiceImpl.getFinancialHealth`，基于消费稳定性、储蓄率、支出集中度等多维加权计算
@@ -162,18 +179,31 @@ E:\LEAR-CODE
 - **数据联动**: 个人财务画像与数据库历史数据实时同步
 - **UI 交互**: 优化的消费占比饼图、支持多行输入的 AI 聊天框
 
-### 6. 失物招领功能
-- **核心逻辑**: 基于AI视觉识别的失物检测和认领管理，支持实时更新失物数量和发现时间
+### 6. 失物招领功能 (LostFound.vue)
+- **核心逻辑**: 基于AI视觉识别的失物检测、认领管理和记录更新
 - **后端实现**: 
   - `LFLostItemController`: 处理失物招领相关API请求
-  - `LFLostItemServiceImpl`: 实现失物招领的业务逻辑，包括记录更新、认领管理等
+  - `LFLostItemServiceImpl`: 实现失物招领的业务逻辑
   - `autoGenerateLostItem`: 处理YOLO检测结果，自动更新或创建失物记录
   - `updateLostItemQuantity`: 支持部分认领功能
+  - `clearAllLostItems`: 清空所有记录（使用TRUNCATE重置自增ID）
 - **前端实现**: 
   - `LostFound.vue`: 失物招领列表、YOLO子系统集成、认领功能
-  - 支持拖拽的YOLO子系统窗口
-  - 优化的认领弹窗，支持全部或指定数量认领
+  - **拖拽式YOLO窗口**: 支持拖拽、调整大小、最小化/恢复/关闭
+  - **认领弹窗**: 支持全部认领或指定数量认领
+  - **筛选功能**: 按教室、物品类型、状态、时间范围筛选
+  - **分页组件**: 支持页码、页大小切换
+  - **动态物品类型**: 从数据中提取唯一物品类型作为筛选选项
+  - **图标系统**: 使用Tabler图标(i-tabler-eye, i-tabler-chart-line等)
 - **AI 集成**: 通过iframe嵌入YOLO子系统，实时接收检测结果
+- **数据同步**: 1秒间隔自动刷新列表
+
+### 7. 数据模拟器 (FloatingSimulator.vue)
+- **核心功能**: 为教室监控系统生成模拟数据
+- **智能生成**: 根据当前时间自动判断课表规律(上课/休息/深夜)
+- **实时同步**: 1秒间隔更新当前时间
+- **UI设计**: 胶囊形悬浮按钮，紫色渐变，橙红色互补色呼吸灯
+- **图标**: i-tabler-chart-line (Tabler图标库)
 
 ## 💡 开发指南
 
@@ -194,24 +224,34 @@ E:\LEAR-CODE
 2. **教室监控模块**: 
    - 修改监控逻辑时，请优先检查 `StatsController` 和 `VisualStatsLogService`
    - 图表调整请前往 `FocusTrendChart.vue` 和 `DashboardView.vue`
+   - YOLO子系统窗口样式在 `DashboardView.vue` 和 `LostFound.vue` 中保持一致
+   - 悬浮按钮布局: YOLO最小化居中(40px), AI视觉(130px), 数据模拟(40px)
+   - 颜色方案: 紫色按钮(#9a65fd) + 橙红色呼吸灯(#ff6b35), 蓝色AI按钮(#00c6ff)
    
 3. **AI 视觉识别模块**: 
    - 模型文件需放置在 `my_yolo_web/models/` 目录
    - 示例文件需放置在 `my_yolo_web/example/` 目录
+   - 检测结果自动保存到 `runs/web_exp/`
+   - 多线程环境下注意使用Lock保证线程安全
    
 4. **前端开发**: 
    - 全局样式遵循简约、玻璃拟态（Glassmorphism）和渐变色风格
    - 新页面需在 `router/index.js` 中配置路由
    - 新增 API 需在对应模块的 api 文件中封装
    - 敏感页面需添加路由守卫保护
+   - 图标优先使用Tabler图标库(i-tabler-xxx)
+   - 动画效果注意性能，使用transform和opacity
    
 5. **后端开发**: 
    - 所有 API 返回格式统一使用 `Result<T>` 对象
    - 新增实体类需同步创建对应的 Mapper 和 Service
    - 数据库操作优先使用 MyBatis-Plus 内置方法
+   - 失物招领模块注意状态(0未认领/1已认领)和数量的原子性操作
    
 6. **运行测试说明**:
    - 如果需要项目进行运行测试，不要自己运行测试，告诉我，我来运行测试。
+   - 确保后端服务(8080端口)和AI服务(5000端口)同时运行
+   - 前端dev服务器使用5173端口，已配置代理到后端
 
 ## 📊 系统集成关系
 - 前端通过 Axios 调用后端 API 获取数据
@@ -219,5 +259,37 @@ E:\LEAR-CODE
 - 后端提供统一的数据访问接口
 - AI 视觉识别系统可独立运行，也可与主系统集成
 - 所有模块共享用户认证信息
+- YOLO检测结果通过HTTP POST推送到后端，自动更新失物记录
+
+## 🎨 UI/UX 设计规范
+
+### 颜色系统
+- **主色调**: 蓝色系 (#409EFF, #00c6ff, #0072ff)
+- **辅助色**: 紫色 (#9a65fd, #7b4af0) - 用于数据模拟
+- **强调色**: 橙红色 (#ff6b35) - 用于呼吸灯效果
+- **成功色**: #67C23A
+- **警告色**: #E6A23C
+- **危险色**: #F56C6C
+
+### 图标系统
+- **图标库**: Iconify (已安装 Tabler, Material Design, Phosphor)
+- **使用方式**: `<i-tabler-icon-name />`
+- **推荐图标**:
+  - 视觉识别: i-tabler-eye
+  - 数据模拟: i-tabler-chart-line
+  - 设置: i-tabler-settings
+  - 分析: i-tabler-chart-bar
+
+### 动画规范
+- **呼吸灯**: 2-3秒周期，ease-in-out缓动
+- **悬停**: 0.3秒过渡，transform scale/shadow
+- **拖拽**: 实时响应，cursor: move
+- **脉冲**: 2秒周期，box-shadow扩散
+
+### 布局原则
+- **悬浮元素**: 右下三角布局，YOLO最小化居中
+- **间距**: 40px/80px/10px三级间距系统
+- **层级**: z-index 1000-2000，YOLO窗口最高
+- **响应式**: 支持窗口调整大小，最小尺寸800x600px
 
 ---

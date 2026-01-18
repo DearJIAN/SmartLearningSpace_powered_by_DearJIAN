@@ -5,7 +5,21 @@
     @click="dialogVisible = true"
   >
     <div class="floating-btn-content">
-      <el-icon class="btn-icon"><Setting /></el-icon>
+      <!-- 方案1: 分析图表图标 (推荐 - 线性风格) -->
+      <i-tabler-chart-line class="btn-icon" />
+      
+      <!-- 方案2: 数据可视化图标 (面性风格) -->
+      <!-- <i-tabler-chart-area class="btn-icon" /> -->
+      
+      <!-- 方案3: 实验室烧杯图标 (实验感) -->
+      <!-- <i-tabler-beaker class="btn-icon" /> -->
+      
+      <!-- 方案4: 仪表盘图标 (监控感) -->
+      <!-- <i-tabler-gauge class="btn-icon" /> -->
+      
+      <!-- 方案5: 数据库图标 (数据感) -->
+      <!-- <i-tabler-database class="btn-icon" /> -->
+      
       <span class="btn-text">数据模拟</span>
     </div>
   </div>
@@ -82,7 +96,6 @@
 import { ref, reactive, onMounted, onUnmounted, computed } from 'vue'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
-import { Setting } from '@element-plus/icons-vue'
 
 const dialogVisible = ref(false)
 const loading = ref(false)
@@ -203,13 +216,13 @@ const resetForm = () => {
 </script>
 
 <style scoped>
-/* 悬浮按钮包裹容器 - 胶囊设计 */
+/* 悬浮按钮包裹容器 - 胶囊设计 - 按钮背景色互补色呼吸灯 */
 .floating-btn-wrapper {
   position: fixed;
   bottom: 40px;
   right: 40px;
   height: 48px;
-  background: linear-gradient(135deg, #409EFF 0%, #3a8ee6 50%, #1f2d3d 100%);
+  background: linear-gradient(135deg, #9a65fd 0%, #7b4af0 50%, #6a3de5 100%);
   border-radius: 24px;
   padding: 0 20px;
   display: flex;
@@ -217,16 +230,16 @@ const resetForm = () => {
   justify-content: center;
   color: white;
   cursor: pointer;
-  box-shadow: 0 4px 15px rgba(64, 158, 255, 0.4);
+  box-shadow: 0 4px 15px rgba(154, 101, 253, 0.4);
   z-index: 2000;
   transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  animation: breathing 3s infinite ease-in-out;
+  animation: breathing-complementary 2.5s infinite ease-in-out;
   user-select: none;
 }
 
 .floating-btn-wrapper:hover {
   transform: scale(1.05) translateY(-2px);
-  box-shadow: 0 8px 25px rgba(64, 158, 255, 0.5);
+  box-shadow: 0 8px 25px rgba(154, 101, 253, 0.6);
   animation-play-state: paused;
 }
 
@@ -242,6 +255,7 @@ const resetForm = () => {
 
 .btn-icon {
   font-size: 20px;
+  color: white;
 }
 
 .btn-text {
@@ -250,11 +264,20 @@ const resetForm = () => {
   letter-spacing: 1px;
 }
 
-/* 呼吸动画 */
-@keyframes breathing {
-  0% { box-shadow: 0 4px 15px rgba(64, 158, 255, 0.4); }
-  50% { box-shadow: 0 4px 25px rgba(64, 158, 255, 0.6); }
-  100% { box-shadow: 0 4px 15px rgba(64, 158, 255, 0.4); }
+/* 互补色呼吸动画 - 紫色背景的互补色是黄绿色/橙色 */
+@keyframes breathing-complementary {
+  0% { 
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.5); /* 橙红色 - 互补色 */
+    transform: scale(1);
+  }
+  50% { 
+    box-shadow: 0 4px 30px rgba(255, 107, 53, 0.9), 0 0 0 4px rgba(255, 107, 53, 0.2); /* 更亮的互补色 */
+    transform: scale(1.02);
+  }
+  100% { 
+    box-shadow: 0 4px 15px rgba(255, 107, 53, 0.5); 
+    transform: scale(1);
+  }
 }
 
 .dialog-footer {
