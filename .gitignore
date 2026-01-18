@@ -13,6 +13,7 @@ Thumbs.db
 # ==============================
 # JetBrains 全家桶 (IDEA, PyCharm, WebStorm 等都会产生这些)
 .idea/
+*.trae/
 *.iws
 *.iml
 **/out/
