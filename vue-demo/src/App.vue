@@ -15,7 +15,7 @@
         active-text-color="#409EFF"
         router
       >
-        <el-menu-item index="/">
+          <el-menu-item index="/">
           <el-icon style="color: #22d3ee"><i-tabler-map-2 /></el-icon>
           <span>校园空间导航</span>
         </el-menu-item>
@@ -30,7 +30,7 @@
           <span>座位预约</span>
         </el-menu-item>
         
-        <el-menu-item index="/accounting/login">
+        <el-menu-item index="/accounting/bills">
           <el-icon style="color: #fbbf24"><i-tabler-wallet /></el-icon>
           <span>个人记账</span>
         </el-menu-item>
@@ -38,6 +38,11 @@
         <el-menu-item index="/analysis" disabled>
           <el-icon style="color: #f87171"><i-tabler-chart-pie /></el-icon>
           <span>数据分析</span>
+        </el-menu-item>
+
+        <el-menu-item index="/logout" class="menu-logout" @click="handleSidebarLogout">
+          <el-icon style="color: #ef4444"><i-tabler-power /></el-icon>
+          <span>退出登录</span>
         </el-menu-item>
       </el-menu>
     </el-aside>
@@ -68,6 +73,19 @@
 
 <script setup>
 // Icons are now auto-imported via unplugin-icons
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { logout } from '@/api/accounting'
+const router = useRouter()
+
+const handleSidebarLogout = async () => {
+  try {
+    await logout()
+  } catch (e) {}
+  try { localStorage.removeItem('currentUser') } catch(e) {}
+  ElMessage.success('已退出登录')
+  router.push('/login')
+}
 </script>
 
 <style>
@@ -123,7 +141,22 @@ body {
 
 .sidebar-menu {
   border-right: none;
-  flex: 1;
+  flex: none;
+}
+
+.menu-logout {
+  padding: 0 20px !important;
+}
+.menu-logout .el-icon {
+  margin-right: 8px;
+}
+
+/* Ensure logout menu item matches height and vertical alignment of other items */
+.menu-logout {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
 }
 
 /* Main Container Styling */

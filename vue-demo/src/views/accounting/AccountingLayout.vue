@@ -67,11 +67,7 @@
             </el-menu-item>
           </el-sub-menu>
 
-          <div class="menu-footer">
-            <el-button link class="logout-btn" @click="handleLogout">
-              <el-icon style="color: #ef4444"><i-ph-power-duotone /></el-icon> 退出系统
-            </el-button>
-          </div>
+          <!-- menu footer removed: '退出系统' was intentionally removed -->
         </el-menu>
       </el-aside>
       
@@ -105,11 +101,20 @@ const userInfo = ref({
 const activeMenu = computed(() => route.path)
 
 onMounted(async () => {
+  // 优先使用 localStorage 缓存，减少依赖后端请求
+  try {
+    const cached = localStorage.getItem('currentUser')
+    if (cached) {
+      userInfo.value = JSON.parse(cached)
+      return
+    }
+  } catch (e) {}
+
   try {
     const res = await getCurrentUser()
     userInfo.value = res.data
   } catch (error) {
-    router.push('/accounting/login')
+    router.push('/login')
   }
 })
 
@@ -123,7 +128,7 @@ const handleLogout = async () => {
     })
     
     await logout()
-    router.push('/accounting/login')
+    router.push('/login')
   } catch (error) {}
 }
 </script>

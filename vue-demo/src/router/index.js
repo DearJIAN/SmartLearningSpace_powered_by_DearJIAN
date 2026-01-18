@@ -4,6 +4,12 @@ const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
+      path: '/login',
+      name: 'login',
+      component: () => import('../views/Login.vue'),
+      meta: { title: '登录' }
+    },
+    {
       path: '/',
       name: 'map',
       component: () => import('../views/MapView.vue'),
@@ -15,13 +21,7 @@ const router = createRouter({
       component: () => import('../views/DashboardView.vue'),
       meta: { title: '教室状态实时看板' }
     },
-    // 记账模块路由
-    {
-      path: '/accounting/login',
-      name: 'accounting-login',
-      component: () => import('../views/accounting/AccountingLogin.vue'),
-      meta: { title: '记账登录' }
-    },
+    
     {
       path: '/accounting',
       component: () => import('../views/accounting/AccountingLayout.vue'),
@@ -95,6 +95,25 @@ const router = createRouter({
       ]
     }
   ]
+})
+
+// 全局路由守卫：仅允许 /login，其他页面需先获取当前用户
+import { getCurrentUser } from '../api/accounting'
+
+router.beforeEach(async (to, from, next) => {
+  if (to.path === '/login') return next()
+  // 首先检查 localStorage，如果存在 currentUser 则认为已登录
+  try {
+    const cached = localStorage.getItem('currentUser')
+    if (cached) return next()
+  } catch (e) {}
+
+  try {
+    await getCurrentUser()
+    next()
+  } catch (err) {
+    next('/login')
+  }
 })
 
 export default router

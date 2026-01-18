@@ -47,8 +47,11 @@
         />
         <el-select v-model="filterParams.categoryId" placeholder="全部分类" clearable @change="handleFilter">
           <el-option v-for="cat in categories" :key="cat.id" :label="cat.name" :value="cat.id">
-            <span style="float: left">{{ cat.name }}</span>
-            <span style="float: right; color: #8492a6; font-size: 13px">{{ cat.type === 1 ? '入' : '出' }}</span>
+            <span style="display:flex;align-items:center;gap:6px;float:left">
+              <component :is="getCategoryIconInfo(cat.name).comp" class="category-icon" :style="{color:getCategoryIconInfo(cat.name).color}" />
+              {{ cat.name }}
+            </span>
+            <span style="float:right;color:#8492a6;font-size:13px">{{ cat.type === 1 ? '入' : '出' }}</span>
           </el-option>
         </el-select>
         <el-select v-model="filterParams.type" placeholder="全部类型" clearable @change="handleFilter">
@@ -97,9 +100,10 @@
           </template>
         </el-table-column>
         
-        <el-table-column label="分类" width="140">
+        <el-table-column label="分类" width="160">
           <template #default="{ row }">
-            <el-tag :type="row.type === 1 ? 'success' : 'warning'" effect="light" round>
+            <el-tag :type="row.type === 1 ? 'success' : 'warning'" effect="light" round style="display:flex;align-items:center;gap:6px">
+              <component :is="getCategoryIconInfo(row.categoryName).comp" class="category-icon" :style="{color:getCategoryIconInfo(row.categoryName).color}" />
               {{ row.categoryName || '未分类' }}
             </el-tag>
           </template>
@@ -187,7 +191,12 @@
               :key="cat.id"
               :label="cat.name"
               :value="cat.id"
-            />
+            >
+              <span style="display:flex;align-items:center;gap:6px">
+                <component :is="getCategoryIconInfo(cat.name).comp" class="category-icon" :style="{color:getCategoryIconInfo(cat.name).color}" />
+                {{ cat.name }}
+              </span>
+            </el-option>
           </el-select>
         </el-form-item>
 
@@ -213,6 +222,25 @@ import {
   exportBillsUrl
 } from '@/api/accounting'
 import dayjs from 'dayjs'
+// 显式导入需要的图标组件（用于动态渲染）
+import IconCashMultiple from 'virtual:icons/mdi/cash-multiple'
+import IconCashPlus from 'virtual:icons/mdi/cash-plus'
+import IconFinance from 'virtual:icons/mdi/finance'
+import IconGiftOpen from 'virtual:icons/mdi/gift-open'
+import IconSilverware from 'virtual:icons/mdi/silverware-fork-knife'
+import IconBus from 'virtual:icons/mdi/bus'
+import IconShopping from 'virtual:icons/mdi/shopping'
+import IconHomeCity from 'virtual:icons/mdi/home-city'
+import IconGamepad from 'virtual:icons/mdi/gamepad-variant'
+import IconHospital from 'virtual:icons/mdi/hospital-box'
+import IconSchool from 'virtual:icons/mdi/school'
+import IconDots from 'virtual:icons/mdi/dots-horizontal-circle'
+import IconTag from 'virtual:icons/mdi/tag'
+import IconHandshake from 'virtual:icons/mdi/handshake'
+import IconBriefcase from 'virtual:icons/mdi/briefcase'
+import IconBank from 'virtual:icons/mdi/bank'
+import IconWallet from 'virtual:icons/mdi/wallet'
+import IconTshirt from 'virtual:icons/mdi/tshirt-crew'
 
 const loading = ref(false)
 const submitting = ref(false)
@@ -394,6 +422,47 @@ const handleExport = () => {
   const url = exportBillsUrl(filterParams)
   window.open(url, '_blank')
 }
+
+// 分类名到图标组件及颜色映射（使用导入的组件）
+const categoryIconMap = {
+  // 后端默认（大学生版）收入
+  '奖学金': { comp: IconSchool, color: '#22c55e' },
+  '理财收益': { comp: IconBank, color: '#0ea5e9' },
+  '兼职收入': { comp: IconBriefcase, color: '#f59e42' },
+  '生活费': { comp: IconWallet, color: '#16a34a' },
+  '其他收入': { comp: IconGiftOpen, color: '#10b981' },
+
+  // 后端默认支出
+  '餐饮美食': { comp: IconSilverware, color: '#ef4444' },
+  '服饰美容': { comp: IconTshirt, color: '#fb7185' },
+  '交通出行': { comp: IconBus, color: '#3b82f6' },
+  '娱乐休闲': { comp: IconGamepad, color: '#8b5cf6' },
+  '生活日用': { comp: IconTag, color: '#f59e42' },
+  '住宿租赁': { comp: IconHomeCity, color: '#fbbf24' },
+  '学术学习': { comp: IconSchool, color: '#f97316' },
+  '医疗健康': { comp: IconHospital, color: '#06b6d4' },
+  '人情往来': { comp: IconHandshake, color: '#f973b8' },
+  '其他杂项': { comp: IconDots, color: '#64748b' },
+
+  // 兼容 older schema / additional
+  '工资': { comp: IconCashMultiple, color: '#16a34a' },
+  '奖金': { comp: IconCashPlus, color: '#22c55e' },
+  '投资收益': { comp: IconFinance, color: '#0ea5e9' },
+  '餐饮': { comp: IconSilverware, color: '#ef4444' },
+  '交通': { comp: IconBus, color: '#3b82f6' },
+  '购物': { comp: IconShopping, color: '#a855f7' },
+  '住房': { comp: IconHomeCity, color: '#fbbf24' },
+  '娱乐': { comp: IconGamepad, color: '#8b5cf6' },
+  '医疗': { comp: IconHospital, color: '#06b6d4' },
+  '教育': { comp: IconSchool, color: '#f97316' },
+  '其他支出': { comp: IconDots, color: '#64748b' },
+}
+
+function getCategoryIconInfo(name) {
+  const info = categoryIconMap[name]
+  if (info) return info
+  return { comp: IconTag, color: '#94a3b8' }
+}
 </script>
 
 <style scoped>
@@ -517,6 +586,22 @@ const handleExport = () => {
 }
 :deep(.el-radio-button__inner) {
   width: 100%;
+}
+
+/* 分类图标样式，使 SVG 居中并与文本垂直对齐 */
+.category-icon {
+  display: inline-flex;
+  width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  vertical-align: middle;
+  margin-right: 6px;
+}
+.category-icon svg {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 </style>
 

@@ -4,7 +4,8 @@ import { ElMessage } from 'element-plus'
 // 创建 axios 实例
 const service = axios.create({
     baseURL: '', // 使用相对路径以配合 Vite 代理
-    timeout: 10000
+    timeout: 10000,
+    withCredentials: true // 允许发送跨域凭证（session cookie）
 })
 
 // 请求拦截器
