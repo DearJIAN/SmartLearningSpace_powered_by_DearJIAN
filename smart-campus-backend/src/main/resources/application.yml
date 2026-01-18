@@ -13,6 +13,13 @@ spring:
       min-idle: 5
       max-active: 20
       max-wait: 60000
+  # 自动执行 SQL 初始化脚本配置
+  sql:
+    init:
+      mode: always
+      platform: mysql
+      # 按顺序执行：先创建 schema，再执行 accounting 脚本
+      schema-locations: file:./sql/schema.sql,file:./sql/accounting_schema.sql
 
 mybatis-plus:
   mapper-locations: classpath:mapper/*.xml
