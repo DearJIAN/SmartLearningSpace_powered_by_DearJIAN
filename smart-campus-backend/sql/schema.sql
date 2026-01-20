@@ -44,3 +44,17 @@ CREATE TABLE IF NOT EXISTS seat_booking (
     end_time DATETIME,
     status INT DEFAULT 0 COMMENT '0:已预约, 1:使用中, 2:已签退, 3:违规'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='座位预约表';
+
+-- 图书馆座位表
+CREATE TABLE IF NOT EXISTS sys_seat (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    seat_code VARCHAR(20) NOT NULL UNIQUE,
+    status INT DEFAULT 0 COMMENT '0:未被占用, 1:已预约, 2:已被占用',
+    user_name VARCHAR(50),
+    start_time DATETIME,
+    check_in_time DATETIME,
+    end_time DATETIME,
+    duration INT DEFAULT 0 COMMENT '使用时长(秒)',
+    create_time DATETIME DEFAULT CURRENT_TIMESTAMP,
+    update_time DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='图书馆座位表';

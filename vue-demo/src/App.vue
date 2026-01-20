@@ -25,7 +25,7 @@
           <span>教室状态监控</span>
         </el-menu-item>
         
-        <el-menu-item index="/reservation" disabled>
+        <el-menu-item index="/seat">
           <el-icon style="color: #34d399"><i-tabler-calendar-event /></el-icon>
           <span>座位预约</span>
         </el-menu-item>

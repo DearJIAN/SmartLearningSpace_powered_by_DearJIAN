@@ -12,6 +12,7 @@
 4. **个人记账与财务洞察**：账单管理、多维统计分析、AI财务助手
 5. **数据分析中心**：校园运营数据综合分析（待开发）
 6. **失物招领功能**：基于AI视觉识别的失物检测、认领管理和记录更新
+7. **座位预约功能**：图书馆座位实时预约、签到、续约、签退管理
 
 ## 🛠️ 技术栈
 ### 后端 (Backend)
@@ -41,9 +42,9 @@
 
 ### 核心模块说明
 - **后端 (`smart-campus-backend`)**:
-  - `com.smartcampus.controller`: 多模块控制器（账单、分析、预算、AI、教室管理、统计分析、认证、失物招领等）
+  - `com.smartcampus.controller`: 多模块控制器（账单、分析、预算、AI、教室管理、统计分析、认证、失物招领、座位预约等）
   - `com.smartcampus.service`: 核心业务逻辑实现
-  - `com.smartcampus.entity`: 数据库映射实体（账单、分类、预算、教室、用户、统计日志、失物招领等）
+  - `com.smartcampus.entity`: 数据库映射实体（账单、分类、预算、教室、用户、统计日志、失物招领、座位等）
   - `com.smartcampus.mapper`: MyBatis-Plus Mapper 接口
   - `com.smartcampus.common`: 通用结果封装 (Result)
   - `com.smartcampus.config`: 配置类
@@ -55,6 +56,7 @@
     - `DashboardView.vue`: 教室状态实时监控看板（含YOLO子系统集成）
     - `MapView.vue`: 校园空间导航
     - `LostFound.vue`: 失物招领功能页面
+    - `SeatReservation.vue`: 座位预约功能页面
     - `accounting/`: 个人记账与财务洞察模块
       - `insight/`: 洞察中心子模块
       - `BillList.vue`: 账单明细列表
@@ -64,7 +66,7 @@
   - `src/components/`: 通用组件
     - `FocusTrendChart.vue`: 专注度趋势图表组件
     - `FloatingSimulator.vue`: 数据模拟悬浮按钮组件
-  - `src/api/`: API接口封装（认证、账单、统计、失物招领等）
+  - `src/api/`: API接口封装（认证、账单、统计、失物招领、座位预约等）
   - `src/utils/`: 工具类
   - `src/router/`: 路由配置（含路由守卫）
   
@@ -83,6 +85,37 @@
   - **后端实现**: 包含LFLostItemController、LFLostItemService、LFLostItemMapper等组件
   - **前端实现**: LostFound.vue页面，包含失物招领列表、YOLO子系统集成、认领功能等
   - **核心特性**: 支持实时更新失物数量、部分认领功能、拖拽式YOLO子系统窗口等
+  - **AI 集成**: 通过iframe嵌入YOLO子系统，实时接收检测结果
+
+- **座位预约功能**:
+  - **核心逻辑**: 图书馆座位实时预约、签到、续约、签退管理
+  - **后端实现**: 
+    - `SeatController`: 处理座位预约相关API请求
+    - `SysSeatServiceImpl`: 实现座位预约的业务逻辑
+    - `initSeats()`: 项目启动时初始化180个座位
+    - `reserve()`: 预约座位，设置状态为已预约
+    - `checkIn()`: 签到入座，设置状态为使用中
+    - `renew()`: 续约座位，延长使用时间
+    - `checkOut()`: 签退座位，释放座位
+    - `resetAll()`: 重置所有座位状态
+    - `simulate()`: 模拟预约场景（30%占用，10%预约）
+    - `checkExpiration()`: 定时检查预约超时和使用结束（2秒间隔）
+  - **前端实现**: 
+    - `SeatReservation.vue`: 座位预约列表、预约弹窗、签到续约签退功能
+    - **实时时钟**: 模拟时钟显示当前时间
+    - **通知中心**: 实时通知系统（超时、未守约、自动释放）
+    - **预约弹窗**: 支持自定义开始时间、使用时长选择
+    - **状态管理**: 空闲、已预约、使用中三种状态
+    - **智能提醒**: 重复提醒、自动释放机制
+    - **数据同步**: 2秒间隔自动刷新座位状态
+  - **核心特性**: 
+    - 180个座位网格展示
+    - 实时时钟（模拟时钟+数字时钟）
+    - 三种状态可视化（空闲/已预约/使用中）
+    - 预约15分钟缓冲期
+    - 重复提醒机制（10秒间隔）
+    - 自动释放机制（30秒后自动签退）
+    - 支持续约功能（30分钟/1小时/2小时）
 
 ### 目录树 (Directory Tree)
 ```text
@@ -90,9 +123,9 @@ E:\LEAR-CODE
 ├── smart-campus-backend (Backend / Spring Boot)
 │   ├── src/main/java/com/smartcampus
 │   │   ├── config/          # 配置类 (MyBatisPlusConfig, WebConfig)
-│   │   ├── controller/      # 控制层 (AccBillController, AccAiController, ClassroomController, StatsController, LFLostItemController等)
-│   │   ├── entity/          # 实体类 (AccBill, AccCategory, SysClassroom, VisualStatsLog, LFLostItem等)
-│   │   ├── mapper/          # DAO 层接口 (AccBillMapper, SysClassroomMapper, VisualStatsLogMapper, LFLostItemMapper等)
+│   │   ├── controller/      # 控制层 (AccBillController, AccAiController, ClassroomController, StatsController, LFLostItemController, SeatController等)
+│   │   ├── entity/          # 实体类 (AccBill, AccCategory, SysClassroom, VisualStatsLog, LFLostItem, SysSeat等)
+│   │   ├── mapper/          # DAO 层接口 (AccBillMapper, SysClassroomMapper, VisualStatsLogMapper, LFLostItemMapper, SysSeatMapper等)
 │   │   ├── service/         # Service 接口及实现
 │   │   │   └── impl/        # Service 实现类
 │   │   └── common/          # 通用结果封装 (Result)
@@ -106,7 +139,7 @@ E:\LEAR-CODE
 │
 ├── vue-demo (Frontend / Vue 3)
 │   ├── src
-│   │   ├── api/             # API 接口封装 (accounting.js)
+│   │   ├── api/             # API 接口封装 (accounting.js, seat.js)
 │   │   ├── components/      # 通用组件 (FocusTrendChart, FloatingSimulator等)
 │   │   ├── router/          # 路由配置（含路由守卫）
 │   │   ├── utils/           # 工具类 (request.js)
@@ -115,6 +148,7 @@ E:\LEAR-CODE
 │   │       ├── DashboardView.vue   # 教室状态监控看板
 │   │       ├── MapView.vue          # 校园空间导航
 │   │       ├── LostFound.vue        # 失物招领功能页面
+│   │       ├── SeatReservation.vue  # 座位预约功能页面
 │   │       └── accounting/          # 个人记账模块
 │   │           ├── insight/         # 洞察中心子模块
 │   │           ├── BillList.vue     # 账单明细
@@ -195,10 +229,33 @@ E:\LEAR-CODE
   - **分页组件**: 支持页码、页大小切换
   - **动态物品类型**: 从数据中提取唯一物品类型作为筛选选项
   - **图标系统**: 使用Tabler图标(i-tabler-eye, i-tabler-chart-line等)
-- **AI 集成**: 通过iframe嵌入YOLO子系统，实时接收检测结果
-- **数据同步**: 1秒间隔自动刷新列表
+  - **AI 集成**: 通过iframe嵌入YOLO子系统，实时接收检测结果
+  - **数据同步**: 1秒间隔自动刷新列表
 
-### 7. 数据模拟器 (FloatingSimulator.vue)
+### 7. 座位预约功能 (SeatReservation.vue)
+- **核心逻辑**: 图书馆座位实时预约、签到、续约、签退管理
+- **后端实现**: 
+  - `SeatController`: 处理座位预约相关API请求
+  - `SysSeatServiceImpl`: 实现座位预约的业务逻辑
+  - `initSeats()`: 项目启动时初始化180个座位（S001-S180）
+  - `reserve()`: 预约座位，设置状态为已预约，支持自定义开始时间和使用时长
+  - `checkIn()`: 签到入座，设置状态为使用中，计算结束时间
+  - `renew()`: 续约座位，延长使用时间
+  - `checkOut()`: 签退座位，释放座位
+  - `resetAll()`: 重置所有座位状态为空闲
+  - `simulate()`: 模拟预约场景（30%占用，10%预约）
+  - `checkExpiration()`: 定时检查预约超时（15分钟未签到）和使用结束
+- **前端实现**: 
+  - `SeatReservation.vue`: 座位预约列表、预约弹窗、签到续约签退功能
+  - **实时时钟**: 模拟时钟显示（指针式+数字式）
+  - **通知中心**: 实时通知系统（超时、未守约、自动释放）
+  - **预约弹窗**: 支持自定义开始时间、使用时长选择（小时/分钟/秒）
+  - **状态管理**: 空闲、已预约、使用中三种状态
+  - **智能提醒**: 重复提醒机制（10秒间隔）、自动释放机制（30秒后）
+  - **数据同步**: 2秒间隔自动刷新座位状态
+  - **UI设计**: 玻璃拟态风格，渐变色设计，实时状态可视化
+
+### 8. 数据模拟器 (FloatingSimulator.vue)
 - **核心功能**: 为教室监控系统生成模拟数据
 - **智能生成**: 根据当前时间自动判断课表规律(上课/休息/深夜)
 - **实时同步**: 1秒间隔更新当前时间
@@ -213,6 +270,7 @@ E:\LEAR-CODE
 - 统计分析: `/api/stats/`
 - 个人记账: `/api/accounting/`
 - 失物招领: `/api/lost-found/`
+- 座位预约: `/api/seat/`
 - AI 视觉识别: `http://localhost:5000/api/`
 
 ### 开发注意事项
@@ -247,6 +305,7 @@ E:\LEAR-CODE
    - 新增实体类需同步创建对应的 Mapper 和 Service
    - 数据库操作优先使用 MyBatis-Plus 内置方法
    - 失物招领模块注意状态(0未认领/1已认领)和数量的原子性操作
+   - 座位预约模块注意状态(0空闲/1已预约/2使用中)和时间管理
    
 6. **运行测试说明**:
    - 如果需要项目进行运行测试，不要自己运行测试，告诉我，我来运行测试。

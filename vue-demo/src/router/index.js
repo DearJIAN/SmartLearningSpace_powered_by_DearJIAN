@@ -27,7 +27,7 @@ const router = createRouter({
       component: () => import('../views/LostFound.vue'),
       meta: { title: '失物招领智能辅助' }
     },
-    
+
     {
       path: '/accounting',
       component: () => import('../views/accounting/AccountingLayout.vue'),
@@ -99,6 +99,12 @@ const router = createRouter({
           meta: { title: '财务时间轴' }
         }
       ]
+    },
+    {
+      path: '/seat',
+      name: 'seat-reservation',
+      component: () => import('../views/SeatReservation.vue'),
+      meta: { title: '图书馆座位预约' }
     }
   ]
 })
@@ -121,7 +127,7 @@ router.beforeEach(async (to, from, next) => {
         localStorage.removeItem('currentUser')
       }
     }
-  } catch (e) {}
+  } catch (e) { }
 
   try {
     await getCurrentUser()
