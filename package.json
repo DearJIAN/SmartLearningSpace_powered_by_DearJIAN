@@ -1,0 +1,7 @@
+{
+  "dependencies": {
+    "@tsparticles/vue3": "^3.0.1",
+    "gsap": "^3.14.2",
+    "tsparticles": "^3.9.1"
+  }
+}

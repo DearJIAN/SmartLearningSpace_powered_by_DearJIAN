@@ -134,16 +134,8 @@
                 <span class="label">使用时间：</span>
                 <span class="value">{{ currentBooking.bookingTime }}</span>
               </div>
-              <div class="booking-item">
-                <span class="label">有效期至：</span>
-                <span class="value">{{ currentBooking.expiryTime }}</span>
-              </div>
             </div>
             <div class="booking-actions">
-              <el-button type="primary" @click="navigateToSeat">
-                <el-icon><i-tabler-navigation /></el-icon>
-                导航到座位
-              </el-button>
               <el-button type="success" @click="navigateToOrdering">
                 <el-icon><i-tabler-shopping-cart /></el-icon>
                 前往点餐
@@ -1050,12 +1042,12 @@ onMounted(() => {
     seats.value = floorDataCache.value[currentFloor.value]
   }
   
-  // 模拟用户已有座位（用于测试"我的座位"卡片显示）
-  currentBooking.value = {
-    seatNumber: '1A01',
-    floor: 1,
-    bookingTime: new Date().toLocaleString(),
-    expiryTime: new Date(Date.now() + 60 * 60 * 1000).toLocaleString() // 1小时后过期
+  // 从 localStorage 读取真实的订座数据（下单成功后写入）
+  const savedBooking = localStorage.getItem('canteen_current_booking')
+  if (savedBooking) {
+    currentBooking.value = JSON.parse(savedBooking)
+  } else {
+    currentBooking.value = null
   }
   
   // 启动时钟
@@ -1536,17 +1528,41 @@ onUnmounted(() => {
   justify-content: center;
 }
 
-/* 实体闹钟样式 */
+/* 实体闹钟样式 - 3D立体效果 */
 .alarm-clock-main {
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-left: auto;
-  padding: 10px 20px;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border-radius: 16px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  margin-left: 20px; /* 往左移动 */
+  margin-right: auto;
+  padding: 15px 25px;
+  background: linear-gradient(145deg, #ffffff, #f5f5f5);
+  backdrop-filter: blur(15px);
+  border-radius: 20px;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.15),
+    0 2px 8px rgba(0, 0, 0, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform: perspective(1000px) rotateX(2deg);
+  transition: all 0.3s ease;
+  animation: float 3s ease-in-out infinite;
+}
+
+.alarm-clock-main:hover {
+  transform: perspective(1000px) rotateX(0deg) translateY(-5px);
+  box-shadow: 
+    0 12px 48px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: perspective(1000px) rotateX(2deg) translateY(0);
+  }
+  50% {
+    transform: perspective(1000px) rotateX(2deg) translateY(-8px);
+  }
 }
 
 .alarm-clock {
@@ -1568,12 +1584,41 @@ onUnmounted(() => {
 }
 
 .clock-hour, .clock-minute, .clock-second {
-  background: linear-gradient(135deg, #fb923c 0%, #f97316 100%);
-  padding: 8px 15px;
-  border-radius: 8px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  background: linear-gradient(145deg, #fb923c 0%, #f97316 50%, #ea580c 100%);
+  padding: 10px 18px;
+  border-radius: 12px;
+  box-shadow: 
+    0 6px 20px rgba(251, 146, 60, 0.4),
+    0 3px 10px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.2);
   color: white;
-  font-size: 28px;
+  font-size: 32px;
+  font-weight: 700;
+  transform: translateZ(20px);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.clock-hour::before, .clock-minute::before, .clock-second::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.2) 0%, transparent 50%);
+  border-radius: 12px;
+  pointer-events: none;
+}
+
+.clock-hour:hover, .clock-minute:hover, .clock-second:hover {
+  transform: translateZ(25px) scale(1.05);
+  box-shadow: 
+    0 8px 28px rgba(251, 146, 60, 0.5),
+    0 4px 14px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4),
+    inset 0 -2px 0 rgba(0, 0, 0, 0.25);
 }
 
 .clock-separator {
@@ -1594,6 +1639,8 @@ onUnmounted(() => {
   font-size: 14px;
   color: #606266;
   font-weight: 500;
+  text-shadow: 0 1px 2px rgba(255, 255, 255, 0.8);
+  margin-top: 5px;
 }
 
 .canteen-floor-selector {

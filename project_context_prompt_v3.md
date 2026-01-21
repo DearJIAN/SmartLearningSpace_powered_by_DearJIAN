@@ -13,6 +13,7 @@
 5. **数据分析中心**：校园运营数据综合分析（待开发）
 6. **失物招领功能**：基于AI视觉识别的失物检测、认领管理和记录更新
 7. **座位预约功能**：图书馆座位实时预约、签到、续约、签退管理
+8. **食堂智能服务**：3D选座、智能点餐、视觉特效界面
 
 ## 🛠️ 技术栈
 ### 后端 (Backend)
@@ -28,6 +29,8 @@
 - **UI 组件库**: Element Plus 2.13.1
 - **数据可视化**: ECharts 5
 - **图标系统**: Iconify (Tabler Icons, Material Design Icons, Phosphor Icons)
+- **动画库**: GSAP (GreenSock Animation Platform)
+- **粒子效果**: tsParticles
 - **样式方案**: 玻璃拟态(Glassmorphism) + 渐变色 + 高对比度设计
 - **通信**: Axios 1.13.2
 
@@ -57,6 +60,9 @@
     - `MapView.vue`: 校园空间导航
     - `LostFound.vue`: 失物招领功能页面
     - `SeatReservation.vue`: 座位预约功能页面
+    - `CanteenManagement.vue`: 食堂智能服务主页面（GSAP动画+tsParticles粒子效果）
+    - `CanteenSeating.vue`: 食堂3D选座页面
+    - `CanteenOrdering.vue`: 食堂智能点餐页面
     - `accounting/`: 个人记账与财务洞察模块
       - `insight/`: 洞察中心子模块
       - `BillList.vue`: 账单明细列表
@@ -149,6 +155,9 @@ E:\LEAR-CODE
 │   │       ├── MapView.vue          # 校园空间导航
 │   │       ├── LostFound.vue        # 失物招领功能页面
 │   │       ├── SeatReservation.vue  # 座位预约功能页面
+│   │       ├── CanteenManagement.vue # 食堂智能服务主页面（GSAP动画+tsParticles粒子效果）
+│   │       ├── CanteenSeating.vue   # 食堂3D选座页面
+│   │       ├── CanteenOrdering.vue  # 食堂智能点餐页面
 │   │       └── accounting/          # 个人记账模块
 │   │           ├── insight/         # 洞察中心子模块
 │   │           ├── BillList.vue     # 账单明细
@@ -264,6 +273,24 @@ E:\LEAR-CODE
 - **UI设计**: 胶囊形悬浮按钮，紫色渐变，橙红色互补色呼吸灯
 - **图标**: i-tabler-chart-line (Tabler图标库)
 
+### 9. 食堂智能服务模块 (CanteenManagement.vue)
+- **核心功能**: 3D选座、智能点餐、视觉特效界面
+- **前端实现**: 
+  - `CanteenManagement.vue`: 食堂智能服务主页面，集成GSAP动画和tsParticles粒子效果
+  - `CanteenSeating.vue`: 食堂3D选座页面
+  - `CanteenOrdering.vue`: 食堂智能点餐页面
+- **关键特性**: 
+  - **GSAP动画**: 实现元素入场动画、3D卡片倾斜效果、火花粒子系统
+  - **tsParticles粒子效果**: 背景粒子效果，支持鼠标交互
+  - **数据流背景**: 动态数据流线条动画
+  - **全息服务指引**: 步骤指引动画效果
+  - **响应式设计**: 适配不同屏幕尺寸
+- **交互体验**: 
+  - 鼠标移动产生火花效果
+  - 点击产生炸裂火花效果
+  - 卡片悬停3D倾斜效果
+  - 流畅的页面转场动画
+
 ## 💡 开发指南
 
 ### API 路径前缀
@@ -274,6 +301,17 @@ E:\LEAR-CODE
 - 失物招领: `/api/lost-found/`
 - 座位预约: `/api/seat/`
 - AI 视觉识别: `http://localhost:5000/api/`
+
+### 前端路由路径
+- 登录: `/login`
+- 校园空间导航: `/`
+- 教室状态监控: `/dashboard`
+- 失物招领: `/lost-found`
+- 图书馆座位预约: `/seat`
+- 食堂智能服务: `/canteen`
+- 食堂智能选座: `/canteen/seating`
+- 食堂智能点餐: `/canteen/ordering`
+- 个人记账: `/accounting/*`
 
 ### 开发注意事项
 1. **用户认证模块**: 
@@ -303,6 +341,9 @@ E:\LEAR-CODE
    - 敏感页面需添加路由守卫保护
    - 图标优先使用Tabler图标库(i-tabler-xxx)
    - 动画效果注意性能，使用transform和opacity
+   - **GSAP动画**: 使用Timeline管理复杂动画序列，注意内存管理
+   - **tsParticles**: 合理配置粒子数量，避免性能问题
+   - **响应式设计**: 针对不同屏幕尺寸调整动画效果和粒子数量
    
 5. **后端开发**: 
    - 所有 API 返回格式统一使用 `Result<T>` 对象

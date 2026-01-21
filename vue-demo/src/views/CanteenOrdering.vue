@@ -527,7 +527,7 @@ const deliveryFee = ref(2.00)
 
 // 返回按钮点击事件
 const goBack = () => {
-  router.push('/canteen')
+  router.push('/canteen/seating')
 }
 
 // 菜品分类数据
@@ -745,6 +745,21 @@ const completePayment = async () => {
   // 保存当前购物车数据用于记账
   const orderItems = [...cartItems.value]
   
+  // 保存座位信息副本（在清空之前）
+  const savedSeatNumber = selectedSeatNumber.value
+  const savedFloor = selectedFloor.value
+  
+  // 持久化座位信息到 localStorage，供选座页面显示
+  if (savedSeatNumber && savedFloor) {
+    const bookingInfo = {
+      seatNumber: savedSeatNumber,
+      floor: savedFloor,
+      bookingTime: new Date().toLocaleString()
+    }
+    localStorage.setItem('canteen_current_booking', JSON.stringify(bookingInfo))
+    console.log('座位信息已保存到 localStorage:', bookingInfo)
+  }
+  
   // 清空购物车
   cartItems.value = []
   
@@ -766,10 +781,10 @@ const completePayment = async () => {
           })
         }
     
-    // 显示支付成功通知和消息
+    // 显示支付成功通知和消息（使用保存的副本）
     ElNotification({
       title: '支付成功',
-      message: `您的订单已支付成功，餐品将送到${selectedFloor.value ? `${selectedFloor.value}楼座位 ${selectedSeatNumber.value}` : '取餐区'}，下单人：${displayOrderer}`,
+      message: `您的订单已支付成功，餐品将送到${savedFloor ? `${savedFloor}楼座位 ${savedSeatNumber}` : '取餐区'}，下单人：${displayOrderer}`,
       type: 'success',
       duration: 5000
     })
@@ -780,7 +795,7 @@ const completePayment = async () => {
     // 即使记账失败，也显示支付成功消息，不影响主流程
     ElNotification({
       title: '支付成功',
-      message: `您的订单已支付成功，餐品将送到${selectedFloor.value ? `${selectedFloor.value}楼座位 ${selectedSeatNumber.value}` : '取餐区'}，下单人：${displayOrderer}`,
+      message: `您的订单已支付成功，餐品将送到${savedFloor ? `${savedFloor}楼座位 ${savedSeatNumber}` : '取餐区'}，下单人：${displayOrderer}`,
       type: 'success',
       duration: 5000
     })
