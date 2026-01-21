@@ -20,7 +20,14 @@
             :content="node.description"
             placement="top"
           >
-            <div class="node-marker" @click="navigateTo(node.path)">
+            <div 
+              class="node-marker" 
+              :class="[
+                'node-marker-' + node.name.toLowerCase().replace(/\s+/g, '-'),
+                {'lost-found': node.id === 5}
+              ]"
+              @click="navigateTo(node.path)"
+            >
               <div class="marker-dot"></div>
               <div class="marker-label">{{ node.name }}</div>
             </div>
@@ -40,19 +47,27 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import mapUrl from '../assets/Map.jpg'
 
 const router = useRouter()
 
+console.log('=== MapView 组件加载 ===')
+console.log('地图图片路径:', mapUrl)
+
+onMounted(() => {
+  console.log('=== MapView 组件已挂载 ===')
+  console.log('空间节点数量:', spatialNodes.value.length)
+})
+
 /**
  * 空间节点坐标修正说明 (基于用户标记图):
- * 1. 学生公寓 (蓝色椭圆): x: 34.0, y: 26.5
- * 2. 校园食堂 (蓝色椭圆下绿色矩形): x: 34.0, y: 43.5
- * 3. 田径体育场 (左侧绿色矩形): x: 14.5, y: 58.5
- * 4. 校图书馆 (中间红色矩形): x: 60.5, y: 43.5
- * 5. 1号教学楼 (红色矩形旁蓝色矩形): x: 69.5, y: 43.5
+ * 1. 1号教学楼 (红色矩形旁蓝色矩形): x: 69.5, y: 43.5
+ * 2. 校图书馆 (中间红色矩形): x: 60.5, y: 43.5
+ * 3. 校园食堂 (蓝色椭圆下绿色矩形): x: 34.0, y: 43.5
+ * 4. 学生公寓 (蓝色椭圆): x: 34.0, y: 26.5
+ * 5. 失物招领 (中心位置): x: 50.0, y: 50.0
  */
 const spatialNodes = ref([
   {
@@ -60,44 +75,45 @@ const spatialNodes = ref([
     name: '1号教学楼',
     description: '查看实时教室占用与学生专注度看板',
     x: 69.5,
-    y: 43.5,
+    y: 30,
     path: '/dashboard'
   },
   {
     id: 2,
     name: '校图书馆',
-    description: '在馆人数监控与自习位预约',
+    description: '座位预约与自习位监控',
     x: 60.5,
     y: 43.5,
-    path: '#'
+    path: '/seat'
   },
   {
     id: 3,
-    name: '田径体育场',
-    description: '体育设施监控 (暂未开放)',
-    x: 14.5,
-    y: 58.5,
-    path: '#'
+    name: '校园食堂',
+    description: '食堂智能服务与点餐系统',
+    x: 34.0,
+    y: 43.5,
+    path: '/canteen'
   },
   {
     id: 4,
-    name: '学生公寓',
-    description: '宿舍安全与用电监测',
+    name: '个人记账',
+    description: '个人财务记录与账单管理',
     x: 34.0,
     y: 26.5,
-    path: '#'
+    path: '/accounting/bills'
   },
   {
     id: 5,
-    name: '校园食堂',
-    description: '今日菜谱与餐厅拥挤度监控',
-    x: 34.0,
-    y: 43.5,
-    path: '#'
+    name: '失物招领',
+    description: '失物智能辅助与查询系统',
+    x: 51.0,
+    y: 30.0,
+    path: '/lost-found'
   }
 ])
 
 const navigateTo = (path) => {
+  console.log('导航到:', path)
   if (path && path !== '#') {
     router.push(path)
   }
@@ -160,6 +176,39 @@ const navigateTo = (path) => {
   z-index: 10;
 }
 
+/* 功能节点分类样式 */
+.node-marker-personal-accounting .marker-dot {
+  background-color: #f59e0b;
+}
+
+.node-marker-seat-booking .marker-dot {
+  background-color: #34d399;
+}
+
+.node-marker-canteen .marker-dot {
+  background-color: #fb923c;
+}
+
+/* 完全移除失物招领按钮的特殊效果 */
+.node-marker-lost-found {
+  animation: none !important;
+}
+
+.node-marker-lost-found .marker-dot {
+  background-color: #8b5cf6;
+  width: 14px;
+  height: 14px;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  box-shadow: 0 0 10px rgba(139, 92, 246, 0.8);
+  animation: none !important;
+}
+
+.node-marker-lost-found:hover {
+  transform: translate(-50%, -50%) scale(1.15);
+  box-shadow: 0 0 15px rgba(139, 92, 246, 0.8);
+}
+
 .node-marker {
   display: flex;
   flex-direction: column;
@@ -193,9 +242,55 @@ const navigateTo = (path) => {
   transform: scale(1.15);
 }
 
+/* 不同功能节点的颜色 */
+.node-marker.personal-accounting:hover .marker-dot {
+  background-color: #f59e0b;
+  box-shadow: 0 0 15px rgba(245, 158, 11, 0.8);
+}
+
+.node-marker.seat-booking:hover .marker-dot {
+  background-color: #34d399;
+  box-shadow: 0 0 15px rgba(52, 211, 153, 0.8);
+}
+
+.node-marker.canteen:hover .marker-dot {
+  background-color: #fb923c;
+  box-shadow: 0 0 15px rgba(251, 146, 60, 0.8);
+}
+
+.node-marker.lost-found:hover .marker-dot {
+  background-color: #8b5cf6;
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.9);
+}
+
+.node-marker.dashboard:hover .marker-dot {
+  background-color: #a78bfa;
+  box-shadow: 0 0 15px rgba(167, 139, 250, 0.8);
+}
+
 .node-marker:hover .marker-dot {
   background-color: #67C23A;
   box-shadow: 0 0 15px rgba(103, 194, 58, 0.8);
+}
+
+/* 3D悬浮效果 */
+@keyframes float3d {
+  0% { 
+    transform: translate(-50%, -50%) scale(1) rotateX(0deg) rotateY(0deg);
+    box-shadow: 0 0 20px rgba(64, 158, 255, 0.6);
+  }
+  33% { 
+    transform: translate(-50%, -50%) scale(1.05) rotateX(5deg) rotateY(5deg);
+    box-shadow: 0 0 30px rgba(64, 158, 255, 0.8);
+  }
+  66% { 
+    transform: translate(-50%, -50%) scale(1.05) rotateX(-5deg) rotateY(-5deg);
+    box-shadow: 0 0 30px rgba(64, 158, 255, 0.8);
+  }
+  100% { 
+    transform: translate(-50%, -50%) scale(1) rotateX(0deg) rotateY(0deg);
+    box-shadow: 0 0 20px rgba(64, 158, 255, 0.6);
+  }
 }
 
 /* 呼吸动画 */

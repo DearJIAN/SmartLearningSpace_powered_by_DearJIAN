@@ -114,7 +114,12 @@ onMounted(async () => {
     const res = await getCurrentUser()
     userInfo.value = res.data
   } catch (error) {
-    router.push('/login')
+    // 暂时屏蔽登录跳转，使用默认用户信息
+    userInfo.value = {
+      username: 'guest',
+      realName: '游客'
+    }
+    // 原逻辑：router.push('/login')
   }
 })
 

@@ -5,8 +5,17 @@
         <div class="logo">
           <!-- Inline SVG logo -->
           <svg width="48" height="48" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
-            <rect width="64" height="64" rx="12" fill="#0b84ff" />
-            <path d="M16 40 L32 24 L48 40" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+            <defs>
+              <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#667eea" />
+                <stop offset="100%" stop-color="#764ba2" />
+              </linearGradient>
+              <filter id="logoShadow" x="-50%" y="-50%" width="200%" height="200%">
+                <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="rgba(102, 126, 234, 0.3)" />
+              </filter>
+            </defs>
+            <rect width="64" height="64" rx="14" fill="url(#logoGradient)" filter="url(#logoShadow)" />
+            <path d="M16 40 L32 24 L48 40" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none" stroke-dasharray="16 8" stroke-dashoffset="0" />
             <circle cx="32" cy="46" r="4" fill="#fff" />
           </svg>
         </div>
@@ -79,17 +88,54 @@ const form = ref({ username: '', password: '', realName: '' })
 const showPassword = ref(false)
 
 const handleLogin = async () => {
+  console.log('=== 开始登录流程 ===')
+  console.log('用户名:', form.value.username)
+  console.log('密码:', form.value.password ? '***' : '')
+
   if (!form.value.username || !form.value.password) {
+    console.warn('登录验证失败：用户名或密码为空')
     ElMessage.warning('请输入用户名和密码')
     return
   }
+
   loading.value = true
+  console.log('开始调用登录API...')
+
   try {
-  const res = await login({ username: form.value.username, password: form.value.password })
-  ElMessage.success(res.msg || '登录成功')
-  try { localStorage.setItem('currentUser', JSON.stringify(res.data || {})) } catch(e) {}
-  router.push('/dashboard')
+    const res = await login({ username: form.value.username, password: form.value.password })
+    console.log('登录API响应:', res)
+    ElMessage.success(res.msg || '登录成功')
+
+    // 缓存用户信息并标记为已验证，避免路由守卫重复验证
+    try {
+      const userData = res.data || {}
+      console.log('准备存储的用户数据:', userData)
+      // 添加时间戳和验证标记，路由守卫可以直接信任
+      userData._verified = true
+      userData._timestamp = Date.now()
+      localStorage.setItem('currentUser', JSON.stringify(userData))
+      console.log('用户数据已存储到localStorage')
+
+      // 验证存储是否成功
+      const stored = localStorage.getItem('currentUser')
+      console.log('从localStorage读取的数据:', stored ? JSON.parse(stored) : null)
+    } catch(e) {
+      console.error('存储用户数据时出错:', e)
+    }
+
+    // 登录后跳转到校园空间导航（默认首页）
+    console.log('准备跳转到首页...')
+    await router.push('/')
+    console.log('跳转成功')
   } catch (err) {
+    console.error('登录失败:', err)
+    console.error('错误详情:', {
+      message: err.message,
+      response: err.response?.data,
+      status: err.response?.status,
+      stack: err.stack
+    })
+    ElMessage.error(err.response?.data?.msg || err.message || '登录失败，请检查网络连接')
   } finally {
     loading.value = false
   }
@@ -101,15 +147,21 @@ const handleRegister = async () => {
     return
   }
   loading.value = true
-    try {
+  try {
     const reg = await register({ username: form.value.username, password: form.value.password, realName: form.value.realName })
     ElMessage.success(reg.msg || '注册成功')
     // 自动登录
     try {
       const res = await login({ username: form.value.username, password: form.value.password })
-      try { localStorage.setItem('currentUser', JSON.stringify(res.data || {})) } catch(e) {}
+      try { 
+        const userData = res.data || {}
+        userData._verified = true
+        userData._timestamp = Date.now()
+        localStorage.setItem('currentUser', JSON.stringify(userData)) 
+      } catch(e) {}
       ElMessage.success('已自动登录')
-      router.push('/dashboard')
+      // 注册后跳转到校园空间导航
+      router.push('/')
       return
     } catch (e) {
       // 登录失败，回到登录模式
@@ -125,127 +177,212 @@ const handleRegister = async () => {
 
 <style scoped>
 .project-login { display:flex; min-height:100vh; /* Make full-page gradient background */
-  background: linear-gradient(135deg,#071226 0%, #0b84ff 100%);
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background-size: 400% 400%;
+  animation: gradientShift 8s ease infinite;
+  overflow: hidden;
+  position: relative;
 }
-.left-panel { flex: 0 0 54%; color:#fff; padding:48px; display:flex; flex-direction:column; justify-content:center; }
-.brand { font-size:28px; font-weight:700; }
-.brand .logo { font-size:36px; margin-bottom:8px }
-.brand .tag { color:rgba(255,255,255,0.85); margin-bottom:24px }
-.illustration { height:320px; background: url('/images/login-illus.svg') no-repeat center/contain; opacity:0.9 }
-.right-panel { flex: 0 0 46%; max-width:480px; display:flex; align-items:center; justify-content:center; padding:24px 18px; background: transparent; }
-.card { width:100%; background:#ffffff; padding:36px; box-shadow:0 10px 30px rgba(2,6,23,0.08); margin-left: -40px; transform: translateY(20px); border-radius: 12px; }
-.card h1 { margin:0 0 6px 0 }
-.card .desc { color:#666; margin-bottom:18px }
-.login-form { margin-top:12px }
-.foot { margin-top:14px; text-align:right }
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.project-login::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+  animation: floating 15s ease infinite;
+}
+
+@keyframes floating {
+  0% { transform: rotate(0deg) translate(0, 0); }
+  25% { transform: rotate(90deg) translate(20px, -20px); }
+  50% { transform: rotate(180deg) translate(0, 0); }
+  75% { transform: rotate(270deg) translate(-20px, 20px); }
+  100% { transform: rotate(360deg) translate(0, 0); }
+}
+.left-panel { flex: 0 0 50%; color:#fff; padding:60px 48px; display:flex; flex-direction:column; justify-content:center; position: relative; z-index: 1; }
+.brand { font-size:32px; font-weight:700; margin-bottom:16px; }
+.brand .logo { font-size:48px; margin-bottom:12px; transition: transform 0.3s ease; }
+.brand .logo:hover { transform: scale(1.05); }
+.brand .tag { color:rgba(255,255,255,0.9); margin-bottom:32px; font-size:18px; }
+.illustration { height:360px; background: url('/images/login-illus.svg') no-repeat center/contain; opacity:0.95; animation: fadeInUp 1s ease-out; }
+.right-panel { flex: 0 0 50%; max-width:500px; display:flex; align-items:center; justify-content:center; padding:32px 24px; background: transparent; position: relative; z-index: 1; }
+.card { width:100%; background: rgba(255, 255, 255, 0.95); padding:48px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15), 0 8px 24px rgba(0, 0, 0, 0.1); margin-left: 0; transform: translateY(0); border-radius: 20px; backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.2); transition: all 0.3s ease; animation: slideInRight 0.8s ease-out; }
+
+.card:hover {
+  box-shadow: 0 25px 70px rgba(0, 0, 0, 0.2), 0 12px 32px rgba(0, 0, 0, 0.15);
+  transform: translateY(-5px);
+}
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 0.95; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px) translateY(20px); }
+  to { opacity: 1; transform: translateX(0) translateY(0); }
+}
+.card h1 { margin:0 0 12px 0; font-size:28px; font-weight:700; color:#1a1a1a }
+.card .desc { color:#666; margin-bottom:32px; font-size:16px; line-height:1.5 }
+.login-form { margin-top:24px }
+.foot { margin-top:24px; text-align:right; font-size:14px }
+
+/* 添加卡片内部元素的间距优化 */
+.login-form :deep(.el-form-item) {
+  margin-bottom: 24px;
+}
+
+/* 优化按钮样式 */
+.login-form :deep(.el-button--primary) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border: none;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+  transition: all 0.3s ease;
+}
+
+.login-form :deep(.el-button--primary):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(102, 126, 234, 0.5);
+}
+
+.login-form :deep(.el-button--primary):active {
+  transform: translateY(0);
+}
+
+/* 优化链接按钮样式 */
+.login-form :deep(.el-button--link) {
+  color: #667eea;
+  transition: all 0.3s ease;
+}
+
+.login-form :deep(.el-button--link):hover {
+  color: #764ba2;
+  text-decoration: underline;
+}
 .pwd-toggle { background: transparent; border: none; padding: 0 6px; display:flex; align-items:center; cursor:pointer }
 .pwd-toggle:focus { outline: none }
 
-/* Remove unintended white background behind suffix/button inside Element Plus input */
-/* Use deep selector so scoped styles apply to internal input suffix elements */
-.login-form ::v-deep .pwd-toggle,
-.login-form ::v-deep .el-input__suffix button.pwd-toggle {
+/* 优化密码切换按钮 */
+.pwd-toggle {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 6px !important;
+  display:flex !important;
+  align-items:center !important;
+  cursor:pointer !important;
+  transition: all 0.3s ease !important;
 }
 
-/* Normalize el-input inner background so suffix area doesn't appear as white rectangle */
-/* 强制输入框宽度一致，前缀图标区绝对定位，输入区100%宽度 */
-.login-form ::v-deep .el-input {
-  position: relative !important;
-  width: 100% !important;
-}
-.login-form ::v-deep .el-input__prefix {
-  position: absolute !important;
-  left: 0 !important;
-  top: 0 !important;
-  width: 44px !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: #fff !important;
-  z-index: 2 !important;
-  border-radius: 0 !important;
-  padding: 0 !important;
-}
-.login-form ::v-deep .el-input__inner {
-  width: 100% !important;
-  margin-left: 44px !important;
-  background: rgba(232,240,254,0.96) !important;
-  border-radius: 0 !important;
-  padding: 8px 10px !important;
-  box-sizing: border-box !important;
+.pwd-toggle:hover {
+  transform: scale(1.1) !important;
 }
 
-/* Suffix (eye icon) should be transparent and not show extra box */
-.login-form ::v-deep .el-input__suffix {
-  position: absolute !important;
-  right: 0 !important;
-  top: 0 !important;
-  width: 44px !important;
-  height: 100% !important;
-  display: flex !important;
-  align-items: center !important;
-  justify-content: center !important;
-  background: transparent !important;
-  z-index: 2 !important;
-  padding: 0 !important;
+.pwd-toggle:focus {
+  outline: none !important;
 }
-/* 让输入框整体（含图标、输入、眼睛）都在同一圆角浅蓝背景内，且高度、宽度、对齐完全一致 */
-.login-form ::v-deep .el-input {
-  width: 100% !important;
-}
-.login-form ::v-deep .el-input__wrapper {
-  background: rgba(232,240,254,0.96) !important;
-  border-radius: 8px !important;
-  box-shadow: none !important;
-  padding: 0 8px !important;
-  min-height: 40px !important;
+
+/* 优化输入框样式和交互效果 */
+.login-form :deep(.el-input__wrapper) {
+  background: rgba(232, 240, 254, 0.96) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08) !important;
+  padding: 0 12px !important;
+  min-height: 50px !important;
   box-sizing: border-box !important;
+  transition: all 0.3s ease !important;
+  border: 2px solid transparent !important;
 }
-.login-form ::v-deep .el-input__inner {
+
+/* 输入框聚焦效果 */
+.login-form :deep(.el-input__wrapper.is-focus) {
+  background: rgba(255, 255, 255, 0.98) !important;
+  box-shadow: 0 4px 16px rgba(102, 126, 234, 0.3) !important;
+  border-color: rgba(102, 126, 234, 0.5) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* 输入框悬停效果 */
+.login-form :deep(.el-input__wrapper:hover) {
+  background: rgba(255, 255, 255, 0.95) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* 输入框内部样式 */
+.login-form :deep(.el-input__inner) {
   background: transparent !important;
   border-radius: 0 !important;
   padding: 0 0 0 0 !important;
-  height: 38px !important;
-  line-height: 38px !important;
+  height: 46px !important;
+  line-height: 46px !important;
+  font-size: 16px !important;
+  transition: all 0.3s ease !important;
 }
-.login-form ::v-deep .el-input__prefix,
-.login-form ::v-deep .el-input__suffix {
+
+/* 输入框前缀和后缀样式 */
+.login-form :deep(.el-input__prefix),
+.login-form :deep(.el-input__suffix) {
   background: transparent !important;
   display: flex !important;
   align-items: center !important;
-  height: 38px !important;
-}
-.login-form ::v-deep .el-input__prefix {
-  margin-right: 4px !important;
-}
-.login-form ::v-deep .el-input__suffix {
-  margin-left: 4px !important;
+  height: 46px !important;
+  transition: all 0.3s ease !important;
 }
 
-/* Prefix area (icon) keep card background so icon sits on white */
-.login-form ::v-deep .el-input__prefix {
-  /* prefix styled above */
+.login-form :deep(.el-input__prefix) {
+  margin-right: 8px !important;
+  font-size: 20px !important;
 }
 
-/* Ensure input wrapper occupies full width */
-.login-form ::v-deep .el-input {
-  /* width set above */
+.login-form :deep(.el-input__suffix) {
+  margin-left: 8px !important;
 }
 
-/* Remove inner border on input so background looks as single block */
-.login-form ::v-deep .el-input__inner,
-.login-form ::v-deep .el-input__prefix {
+/* 输入框聚焦时图标颜色变化 */
+.login-form :deep(.el-input__wrapper.is-focus .el-input__prefix) {
+  color: #667eea !important;
+  transform: scale(1.1) !important;
+}
+
+/* 优化占位符样式 */
+.login-form :deep(.el-input__inner::placeholder) {
+  color: rgba(20, 28, 66, 0.45) !important;
+  transition: all 0.3s ease !important;
+}
+
+.login-form :deep(.el-input__wrapper.is-focus .el-input__inner::placeholder) {
+  color: rgba(20, 28, 66, 0.3) !important;
+  transform: translateX(4px) !important;
+}
+
+/* 添加输入框内容变化时的反馈动画 */
+@keyframes inputPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.01); }
+  100% { transform: scale(1); }
+}
+
+.login-form :deep(.el-input__wrapper) {
+  animation: inputPulse 0.3s ease-out;
+}
+
+/* 优化密码切换图标动画 */
+.login-form :deep(.el-input__suffix) {
+  transition: all 0.3s ease;
+}
+
+/* 移除不必要的样式重置 */
+.login-form :deep(.el-input__inner),
+.login-form :deep(.el-input__prefix) {
   border: none !important;
 }
-
-.login-form ::v-deep .el-input__inner::placeholder {
-  color: rgba(20,28,66,0.45) !important;
-}
-
-/* removed separate right-panel background so card sits on same full-page gradient */
 </style>
