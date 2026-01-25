@@ -9,7 +9,7 @@
 1. **教室状态实时监控**：基于AI视觉识别的教室人数统计、专注度分析、设备管理
 2. **校园空间导航**：校园地图和空间可视化
 3. **用户认证系统**：企业级单点登录和注册功能
-4. **个人记账与财务洞察**：账单管理、多维统计分析、AI财务助手
+4. **个人记账与财务洞察**：账单管理、多维统计分析、AI财务助手、预算管理
 5. **数据分析中心**：校园运营数据综合分析（待开发）
 6. **失物招领功能**：基于AI视觉识别的失物检测、认领管理和记录更新
 7. **座位预约功能**：图书馆座位实时预约、签到、续约、签退管理
@@ -45,9 +45,9 @@
 
 ### 核心模块说明
 - **后端 (`smart-campus-backend`)**:
-  - `com.smartcampus.controller`: 多模块控制器（账单、分析、预算、AI、教室管理、统计分析、认证、失物招领、座位预约等）
+  - `com.smartcampus.controller`: 多模块控制器（账单、分析、预算、AI、教室管理、统计分析、认证、失物招领、座位预约、设备管理、日历、财务洞察、设置等）
   - `com.smartcampus.service`: 核心业务逻辑实现
-  - `com.smartcampus.entity`: 数据库映射实体（账单、分类、预算、教室、用户、统计日志、失物招领、座位等）
+  - `com.smartcampus.entity`: 数据库映射实体（账单、分类、预算、教室、用户、统计日志、失物招领、座位、座位预约、设备、财务目标等）
   - `com.smartcampus.mapper`: MyBatis-Plus Mapper 接口
   - `com.smartcampus.common`: 通用结果封装 (Result)
   - `com.smartcampus.config`: 配置类
@@ -64,22 +64,33 @@
     - `CanteenSeating.vue`: 食堂3D选座页面
     - `CanteenOrdering.vue`: 食堂智能点餐页面
     - `accounting/`: 个人记账与财务洞察模块
+      - `AccountingLayout.vue`: 记账模块布局组件
       - `insight/`: 洞察中心子模块
+        - `InsightDashboard.vue`: 洞察中心仪表盘
+        - `InsightGoal.vue`: 财务目标洞察
+        - `InsightProfile.vue`: 财务画像
+        - `InsightRisk.vue`: 风险分析
+        - `InsightTimeline.vue`: 财务时间线
       - `BillList.vue`: 账单明细列表
       - `BillAnalysis.vue`: 财务统计报表
       - `BillCalendar.vue`: 账单日历视图
+      - `BillTreemap.vue`: 账单树状图分析
+      - `BudgetManagement.vue`: 预算管理
       - `AiChat.vue`: AI智能助手
+      - `chatState.js`: 聊天状态管理
   - `src/components/`: 通用组件
     - `FocusTrendChart.vue`: 专注度趋势图表组件
     - `FloatingSimulator.vue`: 数据模拟悬浮按钮组件
   - `src/api/`: API接口封装（认证、账单、统计、失物招领、座位预约等）
   - `src/utils/`: 工具类
   - `src/router/`: 路由配置（含路由守卫）
+  - `src/assets/`: 静态资源（地图、菜品图片等）
   
 - **AI 视觉识别 (`my_yolo_web`)**:
   - `app.py`: Flask 主应用
   - `web_inference.py`: YOLO 检测核心逻辑（多线程+锁机制）
   - `ai_api.py`: AI 对话接口
+  - `yolo_io_utils.py`: YOLO IO 工具类
   - `static/`: 静态资源
   - `templates/`: HTML 模板
   - `models/`: YOLO模型文件 (.pt)
@@ -129,14 +140,15 @@ E:\LEAR-CODE
 ├── smart-campus-backend (Backend / Spring Boot)
 │   ├── src/main/java/com/smartcampus
 │   │   ├── config/          # 配置类 (MyBatisPlusConfig, WebConfig)
-│   │   ├── controller/      # 控制层 (AccBillController, AccAiController, ClassroomController, StatsController, LFLostItemController, SeatController等)
-│   │   ├── entity/          # 实体类 (AccBill, AccCategory, SysClassroom, VisualStatsLog, LFLostItem, SysSeat等)
-│   │   ├── mapper/          # DAO 层接口 (AccBillMapper, SysClassroomMapper, VisualStatsLogMapper, LFLostItemMapper, SysSeatMapper等)
+│   │   ├── controller/      # 控制层 (AccBillController, AccAiController, ClassroomController, StatsController, LFLostItemController, SeatController, AccAnalysisController, AccBudgetController, AccCalendarController, AccInsightController, AccSetupController, DeviceController等)
+│   │   ├── entity/          # 实体类 (AccBill, AccCategory, SysClassroom, VisualStatsLog, LFLostItem, SysSeat, AccBudget, AccFinancialGoal, SeatBooking, SysUser等)
+│   │   ├── mapper/          # DAO 层接口 (AccBillMapper, SysClassroomMapper, VisualStatsLogMapper, LFLostItemMapper, SysSeatMapper, AccBudgetMapper, AccFinancialGoalMapper, SeatBookingMapper, SysUserMapper等)
 │   │   ├── service/         # Service 接口及实现
 │   │   │   └── impl/        # Service 实现类
 │   │   └── common/          # 通用结果封装 (Result)
 │   ├── sql/                 # 数据库初始化脚本
 │   │   ├── accounting_schema.sql # 记账模块预置数据
+│   │   ├── backup_before_accounting.sql # 记账模块备份数据
 │   │   ├── lost_found_table.sql # 失物招领表结构
 │   │   └── schema.sql       # 数据库表结构
 │   └── src/main/resources
@@ -144,8 +156,12 @@ E:\LEAR-CODE
 │           └── LFLostItemMapper.xml # 失物招领Mapper配置
 │
 ├── vue-demo (Frontend / Vue 3)
+│   ├── public/             # 公共资源
+│   │   ├── images/         # 图片资源
+│   │   └── favicon.ico     # 网站图标
 │   ├── src
 │   │   ├── api/             # API 接口封装 (accounting.js, seat.js)
+│   │   ├── assets/          # 静态资源 (地图、菜品图片等)
 │   │   ├── components/      # 通用组件 (FocusTrendChart, FloatingSimulator等)
 │   │   ├── router/          # 路由配置（含路由守卫）
 │   │   ├── utils/           # 工具类 (request.js)
@@ -159,19 +175,29 @@ E:\LEAR-CODE
 │   │       ├── CanteenSeating.vue   # 食堂3D选座页面
 │   │       ├── CanteenOrdering.vue  # 食堂智能点餐页面
 │   │       └── accounting/          # 个人记账模块
+│   │           ├── AccountingLayout.vue # 记账模块布局
 │   │           ├── insight/         # 洞察中心子模块
+│   │           │   ├── InsightDashboard.vue # 洞察中心仪表盘
+│   │           │   ├── InsightGoal.vue     # 财务目标洞察
+│   │           │   ├── InsightProfile.vue  # 财务画像
+│   │           │   ├── InsightRisk.vue     # 风险分析
+│   │           │   └── InsightTimeline.vue # 财务时间线
 │   │           ├── BillList.vue     # 账单明细
 │   │           ├── BillAnalysis.vue # 财务统计报表
 │   │           ├── BillCalendar.vue # 账单日历
-│   │           └── AiChat.vue       # AI智能助手
+│   │           ├── BillTreemap.vue  # 账单树状图分析
+│   │           ├── BudgetManagement.vue # 预算管理
+│   │           ├── AiChat.vue       # AI智能助手
+│   │           └── chatState.js     # 聊天状态管理
 │   └── package.json
 │
 └── my_yolo_web (AI Vision / Python Flask)
     ├── static/         # 静态资源
     ├── templates/      # HTML 模板
+    ├── ai_api.py       # AI 对话接口
     ├── app.py          # Flask 主应用
     ├── web_inference.py # YOLO 检测核心逻辑
-    └── ai_api.py       # AI 对话接口
+    ├── yolo_io_utils.py # YOLO IO 工具类
 ```
 
 ## 📈 当前进度与核心逻辑
@@ -223,6 +249,12 @@ E:\LEAR-CODE
 - **AI 助手集成**: 对话时注入"实时数据库快照"，能回答预算余额、消费风险、近期结余等问题
 - **数据联动**: 个人财务画像与数据库历史数据实时同步
 - **UI 交互**: 优化的消费占比饼图、支持多行输入的 AI 聊天框
+- **新增功能**: 
+  - 预算管理（BudgetManagement.vue）
+  - 财务目标洞察（InsightGoal.vue）
+  - 财务风险分析（InsightRisk.vue）
+  - 财务时间线（InsightTimeline.vue）
+  - 账单树状图分析（BillTreemap.vue）
 
 ### 6. 失物招领功能 (LostFound.vue)
 - **核心逻辑**: 基于AI视觉识别的失物检测、认领管理和记录更新
@@ -266,19 +298,12 @@ E:\LEAR-CODE
   - **数据同步**: 2秒间隔自动刷新座位状态
   - **UI设计**: 玻璃拟态风格，渐变色设计，实时状态可视化
 
-### 8. 数据模拟器 (FloatingSimulator.vue)
-- **核心功能**: 为教室监控系统生成模拟数据
-- **智能生成**: 根据当前时间自动判断课表规律(上课/休息/深夜)
-- **实时同步**: 1秒间隔更新当前时间
-- **UI设计**: 胶囊形悬浮按钮，紫色渐变，橙红色互补色呼吸灯
-- **图标**: i-tabler-chart-line (Tabler图标库)
-
-### 9. 食堂智能服务模块 (CanteenManagement.vue)
+### 8. 食堂智能服务模块 (CanteenManagement.vue)
 - **核心功能**: 3D选座、智能点餐、视觉特效界面
 - **前端实现**: 
   - `CanteenManagement.vue`: 食堂智能服务主页面，集成GSAP动画和tsParticles粒子效果
   - `CanteenSeating.vue`: 食堂3D选座页面
-  - `CanteenOrdering.vue`: 食堂智能点餐页面
+  - `CanteenOrdering.vue`: 食堂智能点餐页面，包含多种菜品图片资源
 - **关键特性**: 
   - **GSAP动画**: 实现元素入场动画、3D卡片倾斜效果、火花粒子系统
   - **tsParticles粒子效果**: 背景粒子效果，支持鼠标交互
@@ -291,12 +316,20 @@ E:\LEAR-CODE
   - 卡片悬停3D倾斜效果
   - 流畅的页面转场动画
 
+### 9. 数据模拟器 (FloatingSimulator.vue)
+- **核心功能**: 为教室监控系统生成模拟数据
+- **智能生成**: 根据当前时间自动判断课表规律(上课/休息/深夜)
+- **实时同步**: 1秒间隔更新当前时间
+- **UI设计**: 胶囊形悬浮按钮，紫色渐变，橙红色互补色呼吸灯
+- **图标**: i-tabler-chart-line (Tabler图标库)
+
 ## 💡 开发指南
 
 ### API 路径前缀
 - 用户认证: `/api/accounting/auth/`
 - 教室管理: `/api/classroom/`
 - 统计分析: `/api/stats/`
+- 设备管理: `/api/device/`
 - 个人记账: `/api/accounting/`
 - 失物招领: `/api/lost-found/`
 - 座位预约: `/api/seat/`
@@ -333,6 +366,7 @@ E:\LEAR-CODE
    - 示例文件需放置在 `my_yolo_web/example/` 目录
    - 检测结果自动保存到 `runs/web_exp/`
    - 多线程环境下注意使用Lock保证线程安全
+   - 新增 `yolo_io_utils.py` 工具类用于IO操作
    
 4. **前端开发**: 
    - 全局样式遵循简约、玻璃拟态（Glassmorphism）和渐变色风格
@@ -344,6 +378,8 @@ E:\LEAR-CODE
    - **GSAP动画**: 使用Timeline管理复杂动画序列，注意内存管理
    - **tsParticles**: 合理配置粒子数量，避免性能问题
    - **响应式设计**: 针对不同屏幕尺寸调整动画效果和粒子数量
+   - 新增 `AccountingLayout.vue` 作为记账模块的布局组件
+   - 新增多种菜品图片资源用于食堂点餐功能
    
 5. **后端开发**: 
    - 所有 API 返回格式统一使用 `Result<T>` 对象
@@ -351,6 +387,9 @@ E:\LEAR-CODE
    - 数据库操作优先使用 MyBatis-Plus 内置方法
    - 失物招领模块注意状态(0未认领/1已认领)和数量的原子性操作
    - 座位预约模块注意状态(0空闲/1已预约/2使用中)和时间管理
+   - 新增财务相关控制器：AccAnalysisController, AccBudgetController, AccCalendarController, AccInsightController, AccSetupController
+   - 新增设备管理控制器：DeviceController
+   - 新增实体：AccBudget, AccFinancialGoal, SeatBooking, SysUser
    
 6. **运行测试说明**:
    - 如果需要项目进行运行测试，不要自己运行测试，告诉我，我来运行测试。

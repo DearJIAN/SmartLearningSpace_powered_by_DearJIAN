@@ -34,17 +34,6 @@ CREATE TABLE IF NOT EXISTS visual_stats_log (
     raw_json TEXT
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='视觉数据日志表';
 
--- 预约表
-CREATE TABLE IF NOT EXISTS seat_booking (
-    booking_id BIGINT AUTO_INCREMENT PRIMARY KEY,
-    user_id BIGINT,
-    room_id BIGINT,
-    seat_number VARCHAR(20),
-    start_time DATETIME,
-    end_time DATETIME,
-    status INT DEFAULT 0 COMMENT '0:已预约, 1:使用中, 2:已签退, 3:违规'
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='座位预约表';
-
 -- 图书馆座位表
 CREATE TABLE IF NOT EXISTS sys_seat (
     id BIGINT AUTO_INCREMENT PRIMARY KEY,
