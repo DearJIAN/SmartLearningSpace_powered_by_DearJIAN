@@ -70,6 +70,7 @@
       </el-main>
       </el-container>
     </el-container>
+    <DigitalHumanAssistant />
   </div>
 </template>
 
@@ -78,6 +79,7 @@
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { logout } from '@/api/accounting'
+import DigitalHumanAssistant from '@/components/DigitalHumanAssistant.vue'
 import { watch, onMounted } from 'vue'
 
 const router = useRouter()

@@ -1,0 +1,14 @@
+flask
+flask-cors
+requests
+opencv-python
+ultralytics
+numpy
+pillow
+websockets
+volcengine-python-sdk[ark]
+langchain
+langchain-core
+langchain-volcengine
+faster-whisper
+opencc-python-reimplemented

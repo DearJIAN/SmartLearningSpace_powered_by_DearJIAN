@@ -1,0 +1,28 @@
+{
+  "mouseover": [],
+  "click": [],
+  "seasons": [],
+  "time": [],
+  "message": {
+    "default": ["火花已就绪，欢迎互动。"],
+    "console": "火花模型控制台已连接。",
+    "copy": "已复制内容。",
+    "visibilitychange": "欢迎回来。",
+    "changeSuccess": "模型状态已更新。",
+    "changeFail": "当前没有可切换内容。",
+    "photo": "截图已生成。",
+    "goodbye": "下次见。",
+    "hitokoto": "$1",
+    "welcome": "欢迎来到 $1",
+    "referrer": "来自 $1 的朋友你好",
+    "hoverBody": ["你好呀。"],
+    "tapBody": ["请轻点互动。"]
+  },
+  "models": [
+    {
+      "name": "huahuo",
+      "paths": ["/live2d/huahuo/火花.model3.json?v=20260420d"],
+      "message": "已连接火花形象"
+    }
+  ]
+}

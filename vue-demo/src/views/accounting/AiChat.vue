@@ -13,6 +13,10 @@
         </div>
       </div>
       <div class="header-actions">
+        <el-button type="primary" plain @click="openDigitalHuman">
+          <el-icon><i-tabler-sparkles /></el-icon>
+          <span>数字人语音助手</span>
+        </el-button>
         <el-button link @click="clearHistory">
           <el-icon style="color: #ef4444"><i-tabler-trash /></el-icon> <span style="color: #64748b">清空对话</span>
         </el-button>
@@ -105,7 +109,13 @@ const scrollToBottom = () => {
 
 const autoFill = (text) => {
   input.value = text
-  handleSend()
+  openDigitalHuman(text)
+}
+
+const openDigitalHuman = (message = '') => {
+  window.dispatchEvent(new CustomEvent('digital-human-open', {
+    detail: { message: typeof message === 'string' ? message : '' }
+  }))
 }
 
 const handleKeyDown = (e) => {

@@ -1,0 +1,17 @@
+{
+  "default": "signed",
+  "packs": {
+    "signed": {
+      "label": "签名版（当前可用）",
+      "waifuPath": "/live2d-widget-dist/waifu-huahuo.json?v=20260420d",
+      "modelPath": "/live2d/huahuo/火花.model3.json",
+      "description": "当前运行中的资源包。"
+    },
+    "clean": {
+      "label": "无签名版（待放入素材）",
+      "waifuPath": "/live2d-widget-dist/waifu-huahuo.clean.json?v=20260420b",
+      "modelPath": "/live2d/huahuo-clean/火花.model3.json",
+      "description": "把作者提供的 clean 包放到这个目录后即可切换。"
+    }
+  }
+}

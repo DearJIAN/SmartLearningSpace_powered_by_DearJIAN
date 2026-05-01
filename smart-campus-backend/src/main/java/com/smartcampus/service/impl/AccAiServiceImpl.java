@@ -1,9 +1,15 @@
 package com.smartcampus.service.impl;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.smartcampus.service.AccAiService;
-import okhttp3.*;
+import okhttp3.Call;
+import okhttp3.Callback;
+import okhttp3.MediaType;
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.RequestBody;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
@@ -20,12 +26,11 @@ import java.util.concurrent.TimeUnit;
 @Service
 public class AccAiServiceImpl implements AccAiService {
 
-    @Value("${ai.doubao.api-url}")
-    private String apiUrl;
-    @Value("${ai.doubao.api-key}")
-    private String apiKey;
-    @Value("${ai.doubao.model-id}")
-    private String modelId;
+    @Value("${ai.flask.base-url}")
+    private String flaskBaseUrl;
+
+    @Value("${ai.flask.chat-stream-path:/api/chat/stream}")
+    private String chatStreamPath;
 
     private final OkHttpClient client;
     private final ObjectMapper mapper = new ObjectMapper();
@@ -33,7 +38,7 @@ public class AccAiServiceImpl implements AccAiService {
     public AccAiServiceImpl() {
         this.client = new OkHttpClient.Builder()
                 .connectTimeout(60, TimeUnit.SECONDS)
-                .readTimeout(60, TimeUnit.SECONDS)
+                .readTimeout(180, TimeUnit.SECONDS)
                 .writeTimeout(60, TimeUnit.SECONDS)
                 .build();
     }
@@ -41,41 +46,29 @@ public class AccAiServiceImpl implements AccAiService {
     @Override
     public void streamChat(List<Map<String, String>> history, SseEmitter emitter) {
         Map<String, Object> payload = new HashMap<>();
-        payload.put("model", modelId);
         payload.put("messages", history);
-        payload.put("stream", true);
-        payload.put("max_tokens", 4096);
-        payload.put("temperature", 0.1);
-        payload.put("frequency_penalty", 1.2);
-        payload.put("presence_penalty", 0.8);
+        payload.put("scene", "智学空间-个人记账");
 
         try {
             String jsonPayload = mapper.writeValueAsString(payload);
-            RequestBody body = RequestBody.create(jsonPayload, MediaType.parse("application/json"));
-
+            RequestBody body = RequestBody.create(jsonPayload, MediaType.parse("application/json; charset=utf-8"));
             Request request = new Request.Builder()
-                    .url(apiUrl)
+                    .url(buildFlaskUrl())
                     .addHeader("Content-Type", "application/json")
-                    .addHeader("Authorization", "Bearer " + apiKey)
                     .post(body)
                     .build();
 
             client.newCall(request).enqueue(new Callback() {
                 @Override
                 public void onFailure(Call call, IOException e) {
-                    try {
-                        emitter.send(SseEmitter.event().name("error").data("网络错误: " + e.getMessage()));
-                        emitter.complete();
-                    } catch (IOException ex) {
-                        /* ignore */ }
+                    sendError(emitter, "AI 服务连接失败: " + e.getMessage());
                 }
 
                 @Override
                 public void onResponse(Call call, Response response) throws IOException {
                     try (ResponseBody responseBody = response.body()) {
-                        if (!response.isSuccessful()) {
-                            emitter.send(SseEmitter.event().name("error").data("API Error: " + response.code()));
-                            emitter.complete();
+                        if (!response.isSuccessful() || responseBody == null) {
+                            sendError(emitter, "AI 服务返回异常: HTTP " + response.code());
                             return;
                         }
 
@@ -84,24 +77,15 @@ public class AccAiServiceImpl implements AccAiService {
                         String line;
                         while ((line = reader.readLine()) != null) {
                             line = line.trim();
-                            if (line.isEmpty())
+                            if (line.isEmpty()) {
                                 continue;
-                            if (line.equals("data: [DONE]"))
+                            }
+                            if (line.startsWith("delta:")) {
+                                String delta = line.substring("delta:".length());
+                                emitter.send(SseEmitter.event().data(delta.replace("\n", "<br_mark>")));
+                            } else if (line.startsWith("error:")) {
+                                emitter.send(SseEmitter.event().name("error").data(line.substring("error:".length())));
                                 break;
-
-                            if (line.startsWith("data: ")) {
-                                String jsonStr = line.substring(6);
-                                JsonNode root = mapper.readTree(jsonStr);
-                                if (root.has("choices")) {
-                                    JsonNode choice = root.get("choices").get(0);
-                                    if (choice.has("delta") && choice.get("delta").has("content")) {
-                                        String delta = choice.get("delta").get("content").asText();
-                                        // SSE 协议中，data 字段如果包含换行符，客户端可能会解析错误。
-                                        // 我们把 \n 替换成一个特殊标记 <br_mark>，前端再换回来。
-                                        String safeDelta = delta.replace("\n", "<br_mark>");
-                                        emitter.send(SseEmitter.event().data(safeDelta));
-                                    }
-                                }
                             }
                         }
                         emitter.complete();
@@ -110,9 +94,29 @@ public class AccAiServiceImpl implements AccAiService {
                     }
                 }
             });
-
         } catch (Exception e) {
             emitter.completeWithError(e);
+        }
+    }
+
+    private String buildFlaskUrl() {
+        String base = flaskBaseUrl == null ? "" : flaskBaseUrl.trim();
+        String path = chatStreamPath == null ? "/api/chat/stream" : chatStreamPath.trim();
+        if (base.endsWith("/")) {
+            base = base.substring(0, base.length() - 1);
+        }
+        if (!path.startsWith("/")) {
+            path = "/" + path;
+        }
+        return base + path;
+    }
+
+    private void sendError(SseEmitter emitter, String message) {
+        try {
+            emitter.send(SseEmitter.event().name("error").data(message));
+            emitter.complete();
+        } catch (IOException ignored) {
+            emitter.complete();
         }
     }
 }

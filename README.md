@@ -2963,6 +2963,211 @@ sudo systemctl restart smart-campus
 
 ---
 
+---
+
+## 数字人 Live2D + 语音交互集成说明
+
+### 功能说明
+
+本项目已将 AI 助手入口升级为统一的“数字人 Live2D 形象 + 语音交互”方式。数字人助手名为“小悦”，在前端全局悬浮显示，支持文本提问、麦克风输入、AI 回复、浏览器语音播报、停止朗读、静音/取消静音、新会话、展开/收起。
+
+本次只迁移参考项目 `my_huahuo` 中的 Live2D 形象、语音交互、AI 对话调用、ASR/TTS 能力和助手按钮交互。不迁移 `my_huahuo` 的 OOA&D 信息展示页，也不迁移各模块自动讲解功能。
+
+### 主要文件和目录
+
+| 类型 | 文件/目录 | 说明 |
+|------|-----------|------|
+| 前端组件 | `vue-demo/src/components/DigitalHumanAssistant.vue` | 全局数字人助手、语音输入、朗读、AI 对话面板 |
+| 前端 API | `vue-demo/src/api/assistant.js` | Flask 数字人/ASR/AI 流式接口封装 |
+| 前端入口 | `vue-demo/src/App.vue` | 全局挂载数字人助手 |
+| 前端代理 | `vue-demo/vite.config.js` | `/api` 代理 Spring Boot，`/flask-api` 代理 Flask |
+| Live2D 资源 | `vue-demo/public/live2d/` | 火花 Live2D 模型资源 |
+| Live2D Widget | `vue-demo/public/live2d-widget-dist/` | Live2D widget 脚本和样式 |
+| Flask 入口 | `my_yolo_web/app.py` | YOLO + 数字人 AI/语音 API |
+| Flask 服务 | `my_yolo_web/backend/services/` | 火山实时语音、TTS、LangChain/ARK 相关服务 |
+| Flask 依赖 | `my_yolo_web/requirements.txt` | Python 依赖 |
+| Spring AI 服务 | `smart-campus-backend/src/main/java/com/smartcampus/service/impl/AccAiServiceImpl.java` | 财务 AI 转发到 Flask 统一模型服务 |
+| Spring 配置 | `smart-campus-backend/src/main/resources/application.yml` | Spring、Flask AI 服务地址和模型变量占位 |
+
+### Java Spring Boot 后端职责
+
+Spring Boot 后端继续负责核心业务和数据库：
+
+- 用户认证、Session、个人记账用户状态；
+- 账单、预算、财务分析、财务洞察；
+- 教室、设备、统计分析；
+- 失物招领记录、YOLO 检测结果落库；
+- 座位预约、食堂等业务接口；
+- 财务 AI 的业务上下文注入和“生成账单”等业务指令拦截。
+
+启动方式：
+
+```bash
+cd E:/LEAR-CODE/smart-campus-backend
+mvn spring-boot:run
+```
+
+默认端口：`8080`。
+
+主要接口：
+
+- `/api/accounting/**`：认证、账单、预算、分析、洞察、财务 AI；
+- `/api/stats/**`：教室统计；
+- `/api/lost-found/**`：失物招领；
+- `/api/seat/**`：座位预约；
+- `/api/device/**`：设备数据。
+
+Spring Boot 需要的环境变量：
+
+| 变量名 | 用途 |
+|--------|------|
+| `AI_FLASK_BASE_URL` | Flask 数字人/AI 服务地址，默认 `http://127.0.0.1:5000` |
+| `AI_FLASK_CHAT_STREAM_PATH` | Flask 流式聊天路径，默认 `/api/chat/stream` |
+| `ARK_API_KEY` | 兼容旧配置，不建议 Spring 直接使用真实密钥 |
+| `ARK_MODEL` | 兼容旧配置，模型名 |
+| `ARK_CHAT_COMPLETIONS_URL` | 兼容旧配置，ARK chat completions 地址 |
+
+### Python Flask 后端职责
+
+Flask 后端负责 AI 能力和视觉能力：
+
+- YOLO 视觉检测、视频流、模型列表、检测结果、实时统计；
+- 统一 AI 大模型调用；
+- 数字人通用聊天流式输出；
+- Firefox/不支持浏览器原生语音识别时的 `/api/asr`；
+- 服务端 TTS 音频合成；
+- 火山实时语音配置读取。
+
+启动方式必须使用 `newyolo` 环境：
+
+```bash
+cd E:/LEAR-CODE/my_yolo_web
+D:/TOOLS/anaconda/envs/newyolo/python.exe -u app.py
+```
+
+默认端口：`5000`。
+
+主要接口：
+
+- `/api/health`：AI/语音/YOLO 状态；
+- `/api/chat`：普通 AI 对话；
+- `/api/chat/stream`：流式 AI 对话；
+- `/api/voice/chat`：实时语音对话文本入口；
+- `/api/voice/config`：语音配置状态；
+- `/api/asr`：上传音频做语音识别；
+- `/api/tts/synthesize`、`/api/tts/audio/<filename>`：语音合成和播放；
+- `/api/start`、`/api/stop`、`/api/results`、`/api/stats`：YOLO 检测能力。
+
+Flask 需要的环境变量：
+
+| 变量名 | 用途 |
+|--------|------|
+| `ARK_API_KEY` | 火山方舟 API Key |
+| `ARK_BASE_URL` | 火山方舟 API 基础地址 |
+| `ARK_MODEL` | 火山方舟模型 ID |
+| `VOICE_TEMPERATURE` | 文本模型温度 |
+| `VOICE_REALTIME_APP_ID` | 实时语音应用 ID |
+| `VOICE_REALTIME_APP_KEY` | 实时语音应用密钥 |
+| `VOICE_REALTIME_TOKEN` | 实时语音访问令牌，也用于 TTS |
+| `VOICE_REALTIME_RESOURCE_ID` | 实时语音 Resource ID |
+| `VOICE_REALTIME_UID` | 实时语音用户 ID |
+| `VOICE_REALTIME_DIALOG_ADDRESS` | 实时语音 WebSocket 地址 |
+| `VOICE_REALTIME_DIALOG_URI` | 实时语音 WebSocket URI |
+| `VOICE_REALTIME_SPEAKER` | TTS 发音人 |
+| `VOICE_REALTIME_BOT_NAME` | 语音机器人名称 |
+| `VOICE_REALTIME_INPUT_MOD` | 实时语音输入模式 |
+| `ASR_PROVIDER` | ASR 提供方，`doubao` 或 `faster-whisper` |
+| `DOUBAO_ASR_WS_URL` | 豆包 ASR WebSocket 地址 |
+| `DOUBAO_ASR_APP_ID` | 豆包 ASR 应用 ID |
+| `DOUBAO_ASR_ACCESS_TOKEN` | 豆包 ASR Access Token |
+| `DOUBAO_ASR_SECRET_KEY` | 豆包 ASR Secret Key，保留配置项 |
+| `DOUBAO_ASR_RESOURCE_ID` | 豆包 ASR Resource ID |
+| `DOUBAO_ASR_MODEL_NAME` | 豆包 ASR 模型名 |
+| `DOUBAO_ASR_FORMAT` | ASR 音频格式 |
+| `DOUBAO_ASR_RATE` | ASR 采样率 |
+| `DOUBAO_ASR_BITS` | ASR 位深 |
+| `DOUBAO_ASR_CHANNEL` | ASR 声道数 |
+| `DOUBAO_ASR_LANGUAGE` | ASR 语言 |
+| `FLASK_PORT` | Flask 端口，默认 `5000` |
+| `FLASK_DEBUG` | Flask debug 开关 |
+
+真实密钥应写入 `my_yolo_web/.env` 或系统环境变量，不要写入 README、前端代码或提交说明。
+
+### 前端连接方式
+
+前端由 Vite 开发服务器统一代理：
+
+- `/api/**` → Spring Boot `http://localhost:8080/api/**`
+- `/flask-api/**` → Flask `http://localhost:5000/api/**`
+
+数字人助手链路：
+
+| 能力 | 最终链路 |
+|------|----------|
+| Live2D 显示 | 前端 `vue-demo/public/live2d` + `live2d-widget-dist` |
+| 文本 AI 对话 | 非记账页面：前端 → Flask `/api/chat/stream` |
+| 财务 AI 对话 | 前端 → Spring `/api/accounting/ai/chat` → Flask `/api/chat/stream` |
+| 财务业务指令 | 前端 → Spring 拦截执行，例如生成测试账单 |
+| 语音输入 | Chrome/Edge 优先浏览器 Web Speech；其他浏览器走 Flask `/api/asr` |
+| 语音播报 | 前端浏览器 `speechSynthesis`；服务端 TTS 可走 Flask `/api/tts/synthesize` |
+| YOLO 视觉 | 前端 iframe/接口 → Flask YOLO 接口 |
+| 业务数据 | 前端 → Spring Boot → MySQL |
+
+### 本地开发完整启动顺序
+
+1. 启动 MySQL，并确认 `smart_campus` 数据库可用。
+2. 启动 Spring Boot：
+
+```bash
+cd E:/LEAR-CODE/smart-campus-backend
+mvn spring-boot:run
+```
+
+3. 启动 Flask，必须使用 `newyolo`：
+
+```bash
+cd E:/LEAR-CODE/my_yolo_web
+D:/TOOLS/anaconda/envs/newyolo/python.exe -u app.py
+```
+
+4. 启动前端：
+
+```bash
+cd E:/LEAR-CODE/vue-demo
+npm run dev
+```
+
+5. 访问 `http://localhost:5173`。
+
+### 如何使用和验证
+
+1. 打开任意主页面，右下角会出现“数字人助手”按钮和 Live2D 形象。
+2. 点击“数字人助手”展开面板。
+3. 输入文本并发送，验证 AI 回复是否流式出现。
+4. 点击麦克风按钮，说话后停止，验证语音识别结果是否自动发送。
+5. AI 回复后，验证浏览器语音播报是否开始。
+6. 点击“停止”验证朗读中断。
+7. 点击“静音/播报”验证自动朗读开关。
+8. 进入“个人记账 → AI 智能助手”，点击“数字人语音助手”或快捷问题，验证财务 AI 仍能读取预算、风险和账单上下文。
+9. 进入“教室状态监控”或“失物招领”，打开 AI 视觉窗口，验证 YOLO Flask 页面仍能显示。
+10. 检查浏览器控制台没有 Live2D、语音、代理或跨域错误。
+
+### 验证命令
+
+```bash
+# Flask 语法检查
+cd E:/LEAR-CODE/my_yolo_web
+D:/TOOLS/anaconda/envs/newyolo/python.exe -m py_compile app.py ai_api.py backend/services/langchain_service.py backend/services/tts_service.py backend/services/volc_realtime_bridge.py backend/services/volc_realtime_protocol.py
+
+# Spring Boot 打包
+cd E:/LEAR-CODE/smart-campus-backend
+mvn -DskipTests package
+
+# 前端构建
+cd E:/LEAR-CODE/vue-demo
+npm run build
+```
+
 **文档结束**
 
 © 2026 智学空间项目组. 保留所有权利。
