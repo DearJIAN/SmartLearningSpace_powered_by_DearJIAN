@@ -10,9 +10,41 @@
 
 ---
 
+## 🌟 个人水印
+
+本项目为 **DearJIAN** 创制的校园智慧空间治理平台。
+
+### 个人信息
+
+| 标识 | 说明 |
+|------|------|
+| 开发者 | **DearJIAN** |
+| 开发者主页 | [https://github.com/DearJIAN](https://github.com/DearJIAN) |
+| 项目地址 | [SmartLearningSpace_powered_by_DearJIAN](https://github.com/DearJIAN/SmartLearningSpace_powered_by_DearJIAN) |
+
+### 水印展示
+
+项目在以下位置展示个人水印，接受用户监督：
+
+| 位置 | 文件 | 说明 |
+|------|------|------|
+| 登录页底部 | `vue-demo/src/views/Login.vue` | 渐变文字水印，显示 DearJIAN + 项目名 |
+| 全局右下角 | `vue-demo/src/App.vue` | 固定浮层，所有已登录页面可见 |
+| 组件源码 | `vue-demo/src/components/BrandingFooter.vue` | 可复用个人水印组件 |
+
+### 水印设计说明
+
+- **视觉风格**：Flat Design，渐变色文字，低调不抢主视觉
+- **配色**：DearJIAN 用紫蓝渐变（`#a78bfa → #818cf8`），项目名用翠绿渐变（`#34d399 → #6ee7b7`）
+- **交互**：hover 时轻微放大，带平滑过渡动画
+- **无侵扰性**：字号极小（11-12px），不干扰正常业务流程
+
+---
+
 ## 📑 目录
 
 - [📚 文档说明](#📚-文档说明)
+- [🌟 个人水印](#🌟-个人水印)
 - [🎯 项目概述](#🎯-项目概述)
   - [项目简介](#项目简介)
   - [核心价值](#核心价值)
@@ -3139,6 +3171,7 @@ cp .env.example .env
 | .gitignore | 根目录 `.gitignore` 与实际文件对比：全部 13 条规则均与项目文件对应正确 |
 | .gitignore | `my_yolo_web/.gitignore` 与实际文件对比：全部 5 条规则均正确（`ai_api.py` 含历史明文 Key 仍保留忽略） |
 | 命名统一 | AI 助手名统一为「火花」：涉及 `DigitalHumanAssistant.vue`、`AccAiController.java`、`app.py`、`.env`、`.env.example`、`README.md` 共 8 处 |
+| 个人水印 | 新增个人水印组件 `BrandingFooter.vue`，显示"Powered by DearJIAN"和项目名，嵌入登录页底部和全局右下角浮层 |
 
 #### 文档 (Documentation - 2026-05-03 第二轮补充)
 

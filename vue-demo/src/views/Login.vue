@@ -69,6 +69,8 @@
           <span v-else>已有账户？</span>
           <el-button link @click="isLogin = !isLogin">{{ isLogin ? '立即注册' : '去登录' }}</el-button>
         </div>
+
+        <BrandingFooter variant="dark" />
       </div>
     </div>
   </div>
@@ -79,6 +81,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { login, register } from '../api/accounting'
+import BrandingFooter from '@/components/BrandingFooter.vue'
 
 const router = useRouter()
 const formRef = ref(null)
