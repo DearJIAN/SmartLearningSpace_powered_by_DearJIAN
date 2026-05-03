@@ -10,7 +10,7 @@
       <header class="assistant-header">
         <div>
           <span class="assistant-kicker">Live2D + Voice</span>
-          <h2>小悦</h2>
+          <h2>火花</h2>
           <p>{{ modelHint }}</p>
         </div>
         <div class="assistant-header__actions">
@@ -62,7 +62,7 @@
 
       <div ref="historyRef" class="assistant-history">
         <article v-for="(item, index) in messages" :key="index" class="assistant-message" :class="item.role">
-          <strong>{{ item.role === 'user' ? '我' : item.role === 'assistant' ? '小悦' : '系统' }}</strong>
+          <strong>{{ item.role === 'user' ? '我' : item.role === 'assistant' ? '火花' : '系统' }}</strong>
           <p>{{ item.text }}</p>
         </article>
       </div>

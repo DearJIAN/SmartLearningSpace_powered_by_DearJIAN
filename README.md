@@ -4,9 +4,9 @@
 
 本文档是《智学空间·校园智慧空间治理系统》的完整开发说明文档，涵盖了项目的技术架构、功能模块、开发环境搭建、API接口、数据库设计、开发规范等全方位内容。
 
-**文档版本**: v1.0
-**最后更新**: 2026-01-25
-**项目状态**: 核心功能开发完成
+**文档版本**: v2.0.0
+**最后更新**: 2026-05-03
+**项目状态**: 数字人 Live2D + 语音交互已完成集成
 
 ---
 
@@ -20,7 +20,7 @@
 - [🛠️ 技术栈](#🛠️-技术栈)
   - [后端技术栈](#后端技术栈)
   - [前端技术栈](#前端技术栈)
-  - [AI视觉技术栈](#ai视觉技术栈)
+  - [AI视觉与数字人技术栈](#ai视觉与数字人技术栈)
 - [📂 项目结构](#📂-项目结构)
   - [整体目录结构](#整体目录结构)
   - [后端详细结构](#后端详细结构)
@@ -29,12 +29,12 @@
   - [环境要求](#环境要求)
   - [后端环境搭建](#后端环境搭建)
   - [前端环境搭建](#前端环境搭建)
-  - [AI视觉子系统环境搭建](#ai视觉子系统环境搭建)
+  - [AI视觉与数字人子系统环境搭建](#ai视觉与数字人子系统环境搭建)
 - [📦 核心功能模块详解](#📦-核心功能模块详解)
   - [1. 用户认证系统](#1-用户认证系统)
   - [2. 教室状态实时监控](#2-教室状态实时监控)
   - [3. 校园空间导航](#3-校园空间导航)
-  - [4. AI视觉识别子系统](#4-ai视觉识别子系统)
+  - [4. AI视觉识别与数字人子系统](#4-ai视觉识别与数字人子系统)
   - [5. 个人记账与财务洞察](#5-个人记账与财务洞察)
   - [6. 失物招领功能](#6-失物招领功能)
   - [7. 图书馆座位预约](#7-图书馆座位预约)
@@ -47,10 +47,10 @@
   - [用户认证API](#用户认证api)
   - [教室管理API](#教室管理api)
   - [统计分析API](#统计分析api)
-  - [账单管理API](#账单管理api)
-  - [失物招领API](#失物招领api)
-  - [座位预约API](#座位预约api)
-  - [AI视觉API](#ai视觉api)
+  - [账单管理API](#账单管理API)
+  - [失物招领API](#失物招领API)
+  - [座位预约API](#座位预约API)
+  - [AI视觉与数字人API](#ai视觉与数字人API)
 - [🎨 UI/UX设计规范](#🎨-uiux设计规范)
   - [颜色系统](#颜色系统)
   - [图标系统](#图标系统)
@@ -64,18 +64,20 @@
 - [🚢 部署指南](#🚢-部署指南)
   - [后端部署](#后端部署)
   - [前端部署](#前端部署)
-  - [AI视觉子系统部署](#ai视觉子系统部署)
+  - [AI视觉与数字人子系统部署](#ai视觉与数字人子系统部署)
   - [Docker部署](#docker部署)
+- [🔄 版本控制与 .gitignore 说明](#🔄-版本控制与-gitignore-说明)
 - [🔧 常见问题与解决方案](#🔧-常见问题与解决方案)
   - [后端常见问题](#后端常见问题)
   - [前端常见问题](#前端常见问题)
-  - [AI子系统常见问题](#ai子系统常见问题)
+  - [AI与数字人子系统常见问题](#ai与数字人子系统常见问题)
   - [部署常见问题](#部署常见问题)
 - [📞 技术支持](#📞-技术支持)
 - [📝 更新日志](#📝-更新日志)
 - [📄 许可证](#📄-许可证)
+- [🤖 数字人 Live2D + 语音交互集成说明](#数字人-live2d--语音交互集成说明)
 
----
+------
 
 ## 🎯 项目概述
 
@@ -93,10 +95,11 @@
 
 ### 技术亮点
 
-- **前后端分离架构**: Vue 3 + Spring Boot
+- **前后端分离架构**: Vue 3 + Spring Boot + Flask
 - **AI视觉识别**: YOLOv11 目标检测
 - **实时数据流**: WebSocket + 轮询机制
-- **智能对话**: 集成豆包AI API
+- **数字人Live2D**: 全局AI数字人助手"火花" + Live2D形象 + 语音交互
+- **智能对话**: 集成火山方舟 ARK SDK（豆包大模型）
 - **现代化UI**: 玻璃拟态设计 + GSAP动画 + 粒子效果
 - **多端适配**: 响应式设计，支持多种屏幕尺寸
 
@@ -132,15 +135,18 @@
 | Three.js | 0.182.0 | 3D渲染 |
 | Iconify | 最新版 | 图标系统 |
 
-### AI视觉技术栈
+### AI视觉与数字人技术栈
 
 | 技术 | 版本 | 说明 |
 |------|------|------|
-| Python | 3.8+ | 编程语言 |
-| Flask | 最新版 | Web框架 |
+| Python | 3.8+ | 编程语言（newyolo conda 环境） |
+| Flask | 最新版 | Web框架 + YOLO 检测 + AI 对话 + 语音服务 |
 | YOLOv11 | 11n/11m | 目标检测模型 |
 | OpenCV | 最新版 | 图像处理 |
-| 豆包API | 最新版 | AI对话服务 |
+| 火山方舟 ARK SDK | 最新版 | AI 大模型调用（豆包 doubao-seed-1-6） |
+| Live2D Cubism 5 | 最新版 | 数字人形象渲染 |
+| faster-whisper | 1.2.1 | 本地语音识别（ASR） |
+| 火山 TTS | 最新版 | 语音合成 |
 
 ---
 
@@ -172,16 +178,23 @@ E:\LEAR-CODE\
 │   ├── public/                 # 公共资源
 │   └── package.json            # 依赖配置
 │
-└── my_yolo_web/                 # AI视觉子系统
-    ├── app.py                   # Flask主应用
+└── my_yolo_web/                 # AI视觉与数字人子系统
+    ├── app.py                   # Flask主应用（YOLO + AI + 语音）
     ├── web_inference.py         # YOLO检测逻辑
-    ├── ai_api.py                # AI对话接口
     ├── yolo_io_utils.py         # IO工具类
-    ├── models/                  # 模型文件
+    ├── ai_api.py                # [已废弃] 旧版AI对话接口
+    ├── .env                     # 环境变量配置（不纳入版本控制）
+    ├── .env.example             # 环境变量示例文件
+    ├── backend/services/        # AI数字人服务
+    │   ├── langchain_service.py       # ARK大模型服务
+    │   ├── tts_service.py             # TTS语音合成
+    │   ├── volc_realtime_bridge.py    # 火山实时语音桥接
+    │   └── volc_realtime_protocol.py  # 实时语音协议
+    ├── models/                  # YOLO模型文件（.pt，需自行下载）
     ├── static/                  # 静态资源
     ├── templates/               # HTML模板
-    ├── example/                 # 示例文件
-    └── runs/                    # 检测结果输出
+    ├── example/                 # 示例文件（图片/视频）
+    └── runs/                    # 检测结果输出（不纳入版本控制）
 ```
 
 ### 后端详细结构
@@ -2917,6 +2930,85 @@ sudo systemctl restart smart-campus
 
 ---
 
+---
+
+## 🔄 版本控制与 .gitignore 说明
+
+### .gitignore 规则说明
+
+本项目有 **两个** `.gitignore` 文件，分别管理不同子系统的忽略规则：
+
+#### 根目录 `.gitignore`（管理整个项目）
+
+| 类别 | 规则 | 对应实际文件/目录 | 是否正确 |
+|------|------|------------------|---------|
+| 系统垃圾 | `nul`, `**/nul` | Windows NUL 幽灵文件（可能存在） | ✅ |
+| 系统垃圾 | `.DS_Store`, `Thumbs.db` | macOS/Windows 系统文件 | ✅ |
+| IDE 配置 | `.idea/`, `*.iws`, `*.iml`, `**/out/` | JetBrains IDE 本地配置（可能存在） | ✅ |
+| IDE 配置 | `.vscode/`, `*.code-workspace` | VS Code 本地配置（可能存在） | ✅ |
+| IDE 配置 | `.trae/` | Trae IDE 本地配置（可能存在） | ✅ |
+| Java 构建 | `**/target/`, `**/*.class`, `**/*.jar`, `*.war` | Maven/Gradle 编译产物目录 | ✅ |
+| 前端构建 | `**/node_modules/` | npm 依赖目录 | ✅ |
+| 前端构建 | `**/dist/` | Vite/Webpack 构建产物 | ✅ |
+| Python | `**/__pycache__/`, `*.pyc` | Python 字节码缓存 | ✅ |
+| Python | `.venv/`, `venv/`, `env/` | Python 虚拟环境 | ✅ |
+| 敏感配置 | `.env` | Flask 环境变量文件（含真实密钥） | ✅ |
+| YOLO 模型 | `*.pt`, `*.onnx` | YOLO 模型文件（需自行下载） | ✅ |
+| YOLO 模型 | `**/runs/` | YOLO 推理输出目录 | ✅ |
+
+#### `my_yolo_web/.gitignore`（管理 Flask 子系统）
+
+| 类别 | 规则 | 对应实际文件/目录 | 是否正确 |
+|------|------|------------------|---------|
+| IDE 配置 | `.idea/` | JetBrains IDE 配置（可能存在） | ✅ |
+| IDE 配置 | `out/` | 编译输出目录（可能存在） | ✅ |
+| Python | `__pycache__/`, `*.pyc` | Python 字节码缓存 | ✅ |
+| YOLO | `runs/` | YOLO 推理结果目录 | ✅ |
+| 敏感文件 | `ai_api.py` | 含明文 API Key 的旧版文件 | ✅（已清空 Key，但仍保留忽略） |
+
+### 环境变量管理策略
+
+**安全策略**：
+- `.env` 文件包含真实 API Key / Token / Secret，**绝不提交到 Git**
+- 代码中不硬编码任何密钥
+- README 中只写变量名、用途和配置说明，不写真实密钥值
+- 日志和提交说明中不包含敏感信息
+
+**配置模板**：
+- 项目提供了 `my_yolo_web/.env.example` 作为配置模板
+- 新开发者克隆项目后，执行以下操作即可：
+
+```bash
+# 复制示例配置
+cd my_yolo_web
+cp .env.example .env
+
+# 编辑 .env 填入真实密钥
+# ARK_API_KEY=你的真实KEY
+# VOICE_REALTIME_TOKEN=你的真实TOKEN
+# 等等...
+```
+
+### 明确需要提交的文件类型
+
+| 类型 | 是否提交 | 示例 |
+|------|---------|------|
+| 源代码 (.java/.vue/.py/.js/.css) | ✅ 提交 | 全部 |
+| 配置文件模板 (.env.example) | ✅ 提交 | `my_yolo_web/.env.example` |
+| Live2D 模型资源 (.moc3/.json/.png) | ✅ 提交 | `vue-demo/public/live2d/` |
+| 前端静态资源 (图片/字体) | ✅ 提交 | `vue-demo/src/assets/`, `vue-demo/public/images/` |
+| YOLO 示例文件 (图片/视频) | ✅ 提交 | `my_yolo_web/example/` |
+| 数据库初始化脚本 (.sql) | ✅ 提交 | `smart-campus-backend/sql/` |
+| 项目文档 (.md) | ✅ 提交 | `README.md` 等 |
+| 敏感配置 (.env) | ❌ 不提交 | `my_yolo_web/.env` |
+| 依赖目录 (node_modules) | ❌ 不提交 | `vue-demo/node_modules/` |
+| 构建产物 (target/dist) | ❌ 不提交 | `**/target/`, `**/dist/` |
+| YOLO 模型文件 (.pt) | ❌ 不提交 | 需从 ultralytics 官方下载 |
+| 检测结果 (runs) | ❌ 不提交 | `my_yolo_web/runs/` |
+| IDE 配置 (.idea/.vscode/.trae) | ❌ 不提交 | 本地 IDE 设置 |
+
+---
+
 ## 📞 技术支持
 
 ### 联系方式
@@ -2936,24 +3028,149 @@ sudo systemctl restart smart-campus
 
 ## 📝 更新日志
 
+> **版本号格式说明**：主版本.次版本.修订号
+> 版本变更记录按以下分类记录，后续版本请参照此格式：
+> - **新增 (Added)**：新增的功能模块、页面、组件、接口
+> - **修改 (Changed)**：已有功能的改造、替换、升级
+> - **修复 (Fixed)**：BUG 修复
+> - **删除 (Removed)**：已移除的功能、文件、依赖
+> - **优化 (Optimized)**：性能优化、代码重构、配置调整
+> - **安全 (Security)**：安全相关修复或加固
+> - **文档 (Documentation)**：README、注释等文档变更
+
+---
+
+### v2.0.0 (2026-05-03)
+
+> **主题**：数字人 Live2D + 语音交互集成（Golden Release）
+
+#### 新增 (Added)
+
+| 分类 | 文件/模块 | 说明 |
+|------|-----------|------|
+| Flask 后端 | `my_yolo_web/app.py`（重写） | 融合原 YOLO 视觉检测能力 + my_huahuo 的 ARK AI 大模型调用、流式聊天、实时语音对话、ASR 语音识别、TTS 语音合成等数字人能力 |
+| Flask 后端 | `my_yolo_web/backend/services/*` | 迁入火山方舟实时语音桥接 (`volc_realtime_bridge.py`)、TTS 语音合成服务 (`tts_service.py`)、LangChain/ARK 大模型服务 (`langchain_service.py`) |
+| Flask 后端 | `my_yolo_web/.env` | 新建环境变量配置文件，统一管理 ARK_API_KEY、ARK_MODEL、VOICE_REALTIME_*、DOUBAO_ASR_* 等外部 API 密钥和参数 |
+| 前端组件 | `vue-demo/src/components/DigitalHumanAssistant.vue` | 全局数字人助手面板：Live2D 加载、文本/语音对话、流式AI回复、浏览器语音播报、暂停/停止、静音、新会话、展开/收起 |
+| 前端 API | `vue-demo/src/api/assistant.js` | 数字人 Flask API 封装层：健康检查、配置读取、流式聊天、ASR 语音上传、对话消息管理 |
+| 前端资源 | `vue-demo/public/live2d/` | 火花 Live2D 数字人模型资源（贴图、表情、动作） |
+| 前端资源 | `vue-demo/public/live2d-widget-dist/` | Live2D Widget 渲染脚本和样式文件 |
+| Flask 接口 | `/api/health` | AI/语音/YOLO 综合健康状态 |
+| Flask 接口 | `/api/chat/stream` | 流式 AI 对话 SSE 端点（前端核心依赖） |
+| Flask 接口 | `/api/voice/config` | 语音配置状态查询 |
+| Flask 接口 | `/api/voice/chat` | 实时语音文本对话入口 |
+| Flask 接口 | `/api/asr` | 音频上传语音识别（支持 doubao / faster-whisper 双提供方） |
+| Flask 接口 | `/api/tts/synthesize`、`/api/tts/audio/<filename>` | 服务端 TTS 语音合成和音频下载 |
+| Flask 接口 | `/api/debug/env` | 调试用：查看环境变量加载状态 |
+
+#### 修改 (Changed)
+
+| 分类 | 文件 | 说明 |
+|------|------|------|
+| 前端入口 | `vue-demo/src/App.vue` | 集成全局数字人助手 `<DigitalHumanAssistant>`，在路由视图外全局悬浮挂载 |
+| 前端代理 | `vue-demo/vite.config.js` | 新增 `/flask-api` 代理 -> Flask `localhost:5000`，保持 `/api` 代理 Spring Boot `localhost:8080` |
+| 前端路由 | `vue-demo/src/router/index.js` | 配合数字人助手路由逻辑 |
+| 前端页面 | `vue-demo/src/views/accounting/AiChat.vue` | 改造“AI 智能助手”页面，消息发送通过自定义事件转发给全局数字人助手统一处理 |
+| Spring Boot | `AccAiServiceImpl.java` | 财务 AI 对话逻辑迁移：不再直连火山方舟，改为注入财务上下文后转发 Flask `/api/chat/stream` |
+| Spring Boot | `AccAiController.java` | 新增 `/api/accounting/ai/chat` 流式端点，支持 `text/event-stream` 响应 |
+| Spring Boot | `application.yml` | 新增 Flask AI 服务地址配置 (`ai.flask.*`) |
+| Flask 后端 | `requirements.txt` | 新增 volcengine-python-sdk、langchain、faster-whisper、opencc、websockets 等依赖 |
+
+#### 修复 (Fixed)
+
+| 分类 | 说明 |
+|------|------|
+| Flask 后端 | 修复原 `app.py` 中 `ai_api.py` 硬编码 ARK_API_KEY 的安全问题，改为通过 `.env` 统一加载 |
+| Flask 后端 | 修复原 `app.py` 缺少会话管理、流式聊天和不支持多场景对话的问题 |
+
+#### 删除 (Removed)
+
+| 分类 | 文件/模块 | 说明 |
+|------|-----------|------|
+| Flask 后端 | `my_yolo_web/ai_api.py`（旧版调用逻辑） | 不再被新 `app.py` 导入，AI 调用统一使用 ARK SDK（`volcenginesdkarkruntime`） |
+| 不迁移 | my_huahuo OOA&D 信息展示页 | 不迁移 |
+| 不迁移 | my_huahuo 各模块自动讲解功能 | 不迁移 |
+
+#### 优化 (Optimized)
+
+| 分类 | 说明 |
+|------|------|
+| Flask 后端 | 会话管理：6 小时 TTL，每会话最多保留 12 条历史消息 |
+| Flask 后端 | 流式输出：后台线程 + Queue + `stream_with_context`，支持长文本分块 |
+| Flask 后端 | ASR 双提供方：优先 doubao（WebSocket），失败自动回退 faster-whisper（本地 CPU） |
+| 前端 | 浏览器检测：Chrome/Edge 使用浏览器原生 Web Speech API（零延迟），Firefox 走 Flask `/api/asr` |
+| 前端 | 语音播报：使用浏览器 `speechSynthesis`，无需服务端 TTS（降低延迟） |
+
+#### 安全 (Security)
+
+| 分类 | 说明 |
+|------|------|
+| 全局 | 所有 API Key / Token 统一从 `.env` 加载，不在代码、README、提交说明中明文暴露 |
+| README | README 只写变量名、用途和配置说明，不写真实密钥值 |
+
+#### 修复 (Fixed - 2026-05-03 补充)
+
+| 分类 | 说明 |
+|------|------|
+| .gitignore | 修复 *.trae/ 语法错误为 .trae/，移除对 my_yolo_web/example/ 的错误忽略（示例文件为 YOLO 功能所需），清理无效忽略项 |
+| 环境配置 | 修复 .env 中变量名不一致问题：VOLCANO_* → VOICE_REALTIME_*，与 olc_realtime_bridge.py / 	ts_service.py 读取的变量名匹配 |
+| 配置管理 | 新建 my_yolo_web/.env.example 模板文件，解决 .env 不提交后新开发者无法获知配置项的问题 |
+
+#### 文档 (Documentation - 2026-05-03 补充)
+
+| 分类 | 说明 |
+|------|------|
+| README.md | 新增「版本控制与 .gitignore 说明」章节，详细说明忽略规则、环境变量管理策略、配置模板使用方式、需提交/不提交的文件类型 |
+| README.md | 新增「Live2D 表情系统」章节，列出全部 12 种表情，标注「月卡」「水印」为共存表情并说明其叠加渲染特性 |
+| README.md | 技术栈章节更新：AI视觉 → AI视觉与数字人，补充 ARK SDK / Live2D / faster-whisper / 火山 TTS 等技术 |
+| README.md | 项目结构章节更新：补充 ackend/services/、.env、.env.example 等新增/变更文件 |
+| README.md | 项目概述补充数字人 Live2D + 语音交互能力，前后端分离标注为 Vue 3 + Spring Boot + Flask |
+| README.md | 验证步骤补充 Live2D 表情和 AI 助手名「火花」确认项 |
+
+| 分类 | 说明 |
+|------|------|
+| README.md | 文档版本升至 v2.0.0，补充完整的"数字人 Live2D + 语音交互集成说明"章节，含前端/Spring Boot/Flask 三层职责、接口表、变量表、启动顺序、验证步骤 |
+
+#### 安全 (Security - 2026-05-03 第二轮补充)
+
+| 分类 | 说明 |
+|------|------|
+| 敏感信息 | 清空 `ai_api.py` 中的明文 API Key，文件标注为废弃，防止意外提交到 Git |
+| .gitignore | 根目录 `.gitignore` 与实际文件对比：全部 13 条规则均与项目文件对应正确 |
+| .gitignore | `my_yolo_web/.gitignore` 与实际文件对比：全部 5 条规则均正确（`ai_api.py` 含历史明文 Key 仍保留忽略） |
+| 命名统一 | AI 助手名统一为「火花」：涉及 `DigitalHumanAssistant.vue`、`AccAiController.java`、`app.py`、`.env`、`.env.example`、`README.md` 共 8 处 |
+
+#### 文档 (Documentation - 2026-05-03 第二轮补充)
+
+| 分类 | 说明 |
+|------|------|
+| README.md | 目录（TOC）新增「🤖 数字人 Live2D + 语音交互集成说明」可跳转链接，更新 8 处过时子标题名称（AI视觉 → AI视觉与数字人） |
+| README.md | 版本控制章节升级：详细列出根目录 + `my_yolo_web/.gitignore` 共 2 个文件的所有规则，逐一对应实际文件/目录，并标注是否正确 |
+| my_yolo_web/README.md | 全面重写：从旧架构（ai_api.py 模板）更新为新架构（ARK SDK + backend/services/），补充全部 AI 数字人接口、`.env.example` 说明 |
+
+
+---
+
 ### v1.0.0 (2026-01-25)
 
-#### 新增功能
-- ✨ 用户认证系统
-- ✨ 教室状态实时监控
-- ✨ 校园空间导航
-- ✨ 个人记账与财务洞察
-- ✨ 失物招领功能
-- ✨ 图书馆座位预约
-- ✨ 食堂智能服务
-- ✨ AI视觉识别子系统
+> **主题**：核心功能开发完成
+
+#### 新增 (Added)
+- 用户认证系统
+- 教室状态实时监控
+- 校园空间导航
+- 个人记账与财务洞察
+- 失物招领功能
+- 图书馆座位预约
+- 食堂智能服务
+- AI视觉识别子系统 (YOLOv11)
 
 #### 技术特性
-- 🔧 前后端分离架构
-- 🔧 AI视觉集成
-- 🔧 智能数据模拟
-- 🔧 实时数据同步
-- 🔧 现代化UI设计
+- 前后端分离架构 (Vue 3 + Spring Boot + Flask)
+- AI 视觉集成 (YOLOv11 目标检测)
+- 智能数据模拟
+- 实时数据同步
+- 现代化 UI 设计（玻璃拟态 + GSAP 动画 + 粒子效果）
 
 ---
 
@@ -2969,7 +3186,7 @@ sudo systemctl restart smart-campus
 
 ### 功能说明
 
-本项目已将 AI 助手入口升级为统一的“数字人 Live2D 形象 + 语音交互”方式。数字人助手名为“小悦”，在前端全局悬浮显示，支持文本提问、麦克风输入、AI 回复、浏览器语音播报、停止朗读、静音/取消静音、新会话、展开/收起。
+本项目已将 AI 助手入口升级为统一的“数字人 Live2D 形象 + 语音交互”方式。数字人助手名为“火花”，在前端全局悬浮显示，支持文本提问、麦克风输入、AI 回复、浏览器语音播报、停止朗读、静音/取消静音、新会话、展开/收起。
 
 本次只迁移参考项目 `my_huahuo` 中的 Live2D 形象、语音交互、AI 对话调用、ASR/TTS 能力和助手按钮交互。不迁移 `my_huahuo` 的 OOA&D 信息展示页，也不迁移各模块自动讲解功能。
 
@@ -3064,8 +3281,8 @@ Flask 需要的环境变量：
 |--------|------|
 | `ARK_API_KEY` | 火山方舟 API Key |
 | `ARK_BASE_URL` | 火山方舟 API 基础地址 |
-| `ARK_MODEL` | 火山方舟模型 ID |
-| `VOICE_TEMPERATURE` | 文本模型温度 |
+| `ARK_MODEL` | 火山方舟模型 ID（默认 `doubao-seed-1-6-251015`） |
+| `VOICE_TEMPERATURE` | 文本模型温度（默认 `0.4`） |
 | `VOICE_REALTIME_APP_ID` | 实时语音应用 ID |
 | `VOICE_REALTIME_APP_KEY` | 实时语音应用密钥 |
 | `VOICE_REALTIME_TOKEN` | 实时语音访问令牌，也用于 TTS |
@@ -3076,18 +3293,15 @@ Flask 需要的环境变量：
 | `VOICE_REALTIME_SPEAKER` | TTS 发音人 |
 | `VOICE_REALTIME_BOT_NAME` | 语音机器人名称 |
 | `VOICE_REALTIME_INPUT_MOD` | 实时语音输入模式 |
+| `VOICE_REALTIME_SYSTEM_ROLE` | 实时语音系统角色 Prompt |
+| `VOICE_REALTIME_SPEAKING_STYLE` | 实时语音说话风格描述 |
+| `VOICE_REALTIME_RECV_TIMEOUT` | 实时语音接收超时（秒） |
 | `ASR_PROVIDER` | ASR 提供方，`doubao` 或 `faster-whisper` |
 | `DOUBAO_ASR_WS_URL` | 豆包 ASR WebSocket 地址 |
 | `DOUBAO_ASR_APP_ID` | 豆包 ASR 应用 ID |
 | `DOUBAO_ASR_ACCESS_TOKEN` | 豆包 ASR Access Token |
-| `DOUBAO_ASR_SECRET_KEY` | 豆包 ASR Secret Key，保留配置项 |
 | `DOUBAO_ASR_RESOURCE_ID` | 豆包 ASR Resource ID |
 | `DOUBAO_ASR_MODEL_NAME` | 豆包 ASR 模型名 |
-| `DOUBAO_ASR_FORMAT` | ASR 音频格式 |
-| `DOUBAO_ASR_RATE` | ASR 采样率 |
-| `DOUBAO_ASR_BITS` | ASR 位深 |
-| `DOUBAO_ASR_CHANNEL` | ASR 声道数 |
-| `DOUBAO_ASR_LANGUAGE` | ASR 语言 |
 | `FLASK_PORT` | Flask 端口，默认 `5000` |
 | `FLASK_DEBUG` | Flask debug 开关 |
 
@@ -3141,7 +3355,7 @@ npm run dev
 
 ### 如何使用和验证
 
-1. 打开任意主页面，右下角会出现“数字人助手”按钮和 Live2D 形象。
+1. 打开任意主页面，右下角会出现“数字人助手”按钮和 Live2D 火花形象（AI 助手名为“火花”）。
 2. 点击“数字人助手”展开面板。
 3. 输入文本并发送，验证 AI 回复是否流式出现。
 4. 点击麦克风按钮，说话后停止，验证语音识别结果是否自动发送。
@@ -3151,6 +3365,27 @@ npm run dev
 8. 进入“个人记账 → AI 智能助手”，点击“数字人语音助手”或快捷问题，验证财务 AI 仍能读取预算、风险和账单上下文。
 9. 进入“教室状态监控”或“失物招领”，打开 AI 视觉窗口，验证 YOLO Flask 页面仍能显示。
 10. 检查浏览器控制台没有 Live2D、语音、代理或跨域错误。
+
+### Live2D 表情系统
+
+Live2D 火花模型支持 **12 种表情**，包括：
+
+| 表情名称 | 类型 | 说明 |
+|---------|------|------|
+| 01 黑脸 | 独立 | 普通表情 |
+| 02 脸红爱心 | 独立 | 普通表情 |
+| 03 生气 | 独立 | 普通表情 |
+| 04 晕 | 独立 | 普通表情 |
+| 05 ＞＜ | 独立 | 普通表情 |
+| 06 0.0 | 独立 | 普通表情 |
+| 07 星星眼 | 独立 | 普通表情 |
+| 08 流泪 | 独立 | 普通表情 |
+| 10 捧心 | 独立 | 普通表情 |
+| 11 要饭 | 独立 | 普通表情 |
+| **月卡** | **共存** | 可与任意其他表情叠加显示 |
+| **水印** | **共存** | 可与任意其他表情叠加显示 |
+
+> **共存表情说明**：“月卡”和“水印”是可以与其他表情**同时存在**的特殊表情。例如：可以同时显示“07 星星眼” + “月卡” + “水印”，三个表情同时叠加在模型上。这是 Live2D Cubism SDK 原生支持的多表情混合渲染能力。
 
 ### 验证命令
 

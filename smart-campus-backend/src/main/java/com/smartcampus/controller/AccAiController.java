@@ -122,7 +122,7 @@ public class AccAiController {
         // 系统提示词
         Map<String, String> systemMsg = new HashMap<>();
         systemMsg.put("role", "system");
-        systemMsg.put("content", "你是一个极其专业的智能财务管家，集成在校园智慧管理平台中。你的名字叫'小悦'。"
+        systemMsg.put("content", "你是一个极其专业的智能财务管家，集成在校园智慧管理平台中。你的名字叫'火花'。"
                 + "\n你的职责：分析数据、提供建议、辅助记账。"
                 + "\n当前财务背景：" + context.toString()
                 + "\n回答要求：1.务必基于提供的[实时数据]进行回答。2.语气亲切、精炼。3.如果涉及多项数据，请使用Markdown表格展示。");

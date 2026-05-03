@@ -1,0 +1,13 @@
+# IDE
+.idea/
+out/
+
+# Python
+__pycache__/
+*.pyc
+
+# YOLO 推理结果
+runs/
+
+# 敏感文件
+ai_api.py

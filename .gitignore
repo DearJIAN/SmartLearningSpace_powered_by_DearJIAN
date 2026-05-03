@@ -1,5 +1,5 @@
 # ==============================
-# 1. 核心系统垃圾与幽灵文件 (最重要)
+# 1. 核心系统垃圾与幽灵文件
 # ==============================
 nul
 **/nul
@@ -9,11 +9,10 @@ vue-demo/nul
 Thumbs.db
 
 # ==============================
-# 2. 全能 IDE 配置 (覆盖所有编辑器)
+# 2. IDE 配置 (覆盖所有编辑器)
 # ==============================
-# JetBrains 全家桶 (IDEA, PyCharm, WebStorm 等都会产生这些)
+# JetBrains 全家桶 (IDEA, PyCharm, WebStorm)
 .idea/
-*.trae/
 *.iws
 *.iml
 **/out/
@@ -21,6 +20,9 @@ Thumbs.db
 # VS Code
 .vscode/
 *.code-workspace
+
+# Trae IDE
+.trae/
 
 # ==============================
 # 3. Java 后端 (Smart Campus)
@@ -30,8 +32,6 @@ Thumbs.db
 **/*.jar
 *.war
 *.ear
-# 如果你不希望上传 Maven 包装器，可以取消下面注释
-# .mvn/
 
 # ==============================
 # 4. Vue 前端 (Vue Demo)
@@ -50,12 +50,13 @@ pnpm-debug.log*
 .venv/
 venv/
 env/
+
+# 敏感文件 - 不提交真实 .env
+# 请将 my_yolo_web/.env.example 复制为 my_yolo_web/.env 并填入真实密钥
 .env
 
-# YOLO 特有运行结果和模型
+# YOLO 运行结果和模型文件 (体积大，不纳入版本控制)
+# 模型文件 .pt/.onnx 需从 ultralytics 官方下载，放入 my_yolo_web/models/
 **/runs/
 *.pt
 *.onnx
-
-
-my_yolo_web/example/
