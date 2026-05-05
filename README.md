@@ -8,6 +8,8 @@
 **最后更新**: 2026-05-03
 **项目状态**: 数字人 Live2D + 语音交互已完成集成
 
+live2D形象来源：https://www.bilibili.com/video/BV1jANPzvE7q/?spm_id_from=333.1387.favlist.content.click&vd_source=7142822062f84579a9e9978ccf625238
+
 ---
 
 ## 🌟 个人水印
