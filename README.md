@@ -224,7 +224,7 @@ E:\LEAR-CODE\
     │   ├── tts_service.py             # TTS语音合成
     │   ├── volc_realtime_bridge.py    # 火山实时语音桥接
     │   └── volc_realtime_protocol.py  # 实时语音协议
-    ├── models/                  # YOLO模型文件（.pt，需自行下载）
+    ├── models/                  # YOLO模型文件（.pt，官方模型需下载，自训练模型已纳入版本控制）
     ├── static/                  # 静态资源
     ├── templates/               # HTML模板
     ├── example/                 # 示例文件（图片/视频）
@@ -793,9 +793,11 @@ function adjustDataBySchedule() {
 **模型文件**:
 ```
 my_yolo_web/models/
-├── yolo11n.pt      # 轻量级模型 (5.3MB)
-├── yolo11m.pt      # 中型模型 (38.8MB)
-└── custom_classroom.pt  # 自定义教室模型
+├── yolo11n.pt      # 官方 ultralytics 轻量级模型 (5.3MB)，需从 ultralytics 官方下载
+├── yolo11m.pt      # 官方 ultralytics 中型模型 (38.8MB)，需从 ultralytics 官方下载
+├── classroom_object_detection_1-_best_-_classroom_-s-800.pt  # 自训练轻量教室检测模型 (18.3MB)
+├── classroom_object_detection_2-_best_-_classroom_-m-800.pt  # 自训练中型教室检测模型 (38.7MB)
+└── best.pt         # 旧备份模型（不建议使用）
 ```
 
 **模型对比**:
@@ -2987,7 +2989,7 @@ sudo systemctl restart smart-campus
 | Python | `**/__pycache__/`, `*.pyc` | Python 字节码缓存 | ✅ |
 | Python | `.venv/`, `venv/`, `env/` | Python 虚拟环境 | ✅ |
 | 敏感配置 | `.env` | Flask 环境变量文件（含真实密钥） | ✅ |
-| YOLO 模型 | `*.pt`, `*.onnx` | YOLO 模型文件（需自行下载） | ✅ |
+| YOLO 模型 | `**/models/` | YOLO 模型目录（.pt 等，全部纳入版本控制） | ✅ |
 | YOLO 模型 | `**/runs/` | YOLO 推理输出目录 | ✅ |
 
 #### `my_yolo_web/.gitignore`（管理 Flask 子系统）
@@ -3037,7 +3039,7 @@ cp .env.example .env
 | 敏感配置 (.env) | ❌ 不提交 | `my_yolo_web/.env` |
 | 依赖目录 (node_modules) | ❌ 不提交 | `vue-demo/node_modules/` |
 | 构建产物 (target/dist) | ❌ 不提交 | `**/target/`, `**/dist/` |
-| YOLO 模型文件 (.pt) | ❌ 不提交 | 需从 ultralytics 官方下载 |
+| YOLO 模型目录 (models/) | ✅ 提交 | my_yolo_web/models/（包含所有 .pt 模型文件） |
 | 检测结果 (runs) | ❌ 不提交 | `my_yolo_web/runs/` |
 | IDE 配置 (.idea/.vscode/.trae) | ❌ 不提交 | 本地 IDE 设置 |
 
