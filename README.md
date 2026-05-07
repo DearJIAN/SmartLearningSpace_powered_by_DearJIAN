@@ -64,6 +64,7 @@ live2D形象来源：https://www.bilibili.com/video/BV1jANPzvE7q/?spm_id_from=33
   - [后端环境搭建](#后端环境搭建)
   - [前端环境搭建](#前端环境搭建)
   - [AI视觉与数字人子系统环境搭建](#ai视觉与数字人子系统环境搭建)
+  - [一键启动](#一键启动)
 - [📦 核心功能模块详解](#📦-核心功能模块详解)
   - [1. 用户认证系统](#1-用户认证系统)
   - [2. 教室状态实时监控](#2-教室状态实时监控)
@@ -134,6 +135,7 @@ live2D形象来源：https://www.bilibili.com/video/BV1jANPzvE7q/?spm_id_from=33
 - **实时数据流**: WebSocket + 轮询机制
 - **数字人Live2D**: 全局AI数字人助手"火花" + Live2D形象 + 语音交互
 - **智能对话**: 集成火山方舟 ARK SDK（豆包大模型）
+- **功能引导页**: 首次访问时展示系统功能介绍，帮助用户快速了解平台能力
 - **现代化UI**: 玻璃拟态设计 + GSAP动画 + 粒子效果
 - **多端适配**: 响应式设计，支持多种屏幕尺寸
 
@@ -532,6 +534,56 @@ python app.py
 ```
 
 AI服务启动后访问: http://localhost:5000
+
+---
+
+### 一键启动
+
+项目根目录提供了 `start.bat` 一键启动脚本（纯 ASCII，无 Windows 编码兼容问题），可同时启动全部三个服务（Flask + Spring Boot + Vue 前端）。
+
+#### 功能特性
+
+- 自动检测 `node_modules`，缺失时自动执行 `npm install`
+- 三个服务分别在独立窗口中启动，互不影响
+- 启动顺序：Flask (5000) → Spring Boot (8080) → Vue (5173)
+- 每个窗口标题明确标注，方便识别
+
+#### 使用方式
+
+双击运行 `start.bat`，或以管理员身份运行：
+
+```bash
+E:\LEAR-CODE\start.bat
+```
+
+#### 启动后访问
+
+| 服务 | 地址 |
+|------|------|
+| Vue 前端 | http://localhost:5173 |
+| Spring Boot | http://localhost:8080 |
+| Flask AI | http://localhost:5000 |
+
+> **注意**：每次运行 `start.bat` 都会执行 `npm install`，确保依赖最新，首次启动耗时较长请耐心等待。
+
+#### 单独启动（可选）
+
+如需单独启动某个服务，可分别运行：
+
+```bash
+# 1. Flask AI 视觉与数字人（必须在 newyolo 环境）
+cd my_yolo_web
+D:\TOOLS\anaconda\envs\newyolo\python.exe -u app.py
+
+# 2. Spring Boot 后端
+cd smart-campus-backend
+mvn spring-boot:run
+
+# 3. Vue 前端
+cd vue-demo
+npm install   # 首次运行需要
+npm run dev
+```
 
 ---
 
@@ -3076,6 +3128,49 @@ cp .env.example .env
 
 ---
 
+### v2.1.0 (2026-05-07)
+
+> **主题**：Live2D 表情系统重构 + 全局水印 + 引导页功能
+
+#### 新增功能
+
+| 分类 | 文件/模块 | 说明 |
+|------|-----------|------|
+| 前端组件 | `vue-demo/src/components/GuideTour.vue` | 新增功能引导页组件，首次访问时展示系统功能介绍，支持步骤导航和跳过功能 |
+| 全局水印 | `vue-demo/src/App.vue` | 在所有非登录页面底部显示 "Powered by DearJIAN \| SmartLearningSpace" 水印，点击可跳转 GitHub |
+| Live2D 辅助函数 | `DigitalHumanAssistant.vue` | 新增 `getCurrentCubism5Model()`、`getCubismCoreModel()`、`resolveParamIdObject()` 等辅助函数，用于正确获取 Cubism 5 模型实例 |
+
+#### 功能修改
+
+| 分类 | 文件 | 说明 |
+|------|------|------|
+| Live2D 表情系统 | `DigitalHumanAssistant.vue` | 重构表情控制逻辑：使用 `model.setExpression()` 替代手动参数设置，实现基础表情与叠加效果（水印/月卡）的共存 |
+| Live2D 拖拽范围 | `vue-demo/src/App.vue` | 修复 `#waifu` 容器的 `pointer-events` 设置，确保只有 canvas 可拖拽，不影响页面其他元素点击 |
+| 全局水印显示 | `vue-demo/src/App.vue` | 添加 `isLoginPage` 计算属性，登录页使用深色水印，其他页面使用浅色水印 |
+
+#### Bug 修复
+
+| 分类 | 说明 |
+|------|------|
+| Live2D 表情点击无反应 | **根因分析**：原代码使用 `mgr.cubism5model.getModel()` 尝试获取模型，但该方法返回的对象不正确；且尝试手动设置参数 (`setParamFloat`) 而非使用 SDK 标准方法。**解决方案**：参考成功项目实现，通过 `subdelegates.at(0).getLive2DManager()._models.at(0)` 正确获取模型实例，并使用 `model.setExpression()` 方法设置表情 |
+| Live2D 眼睛闪烁 | 移除初始化时调用 `model.setExpression('')` 的逻辑，避免表情被意外重置 |
+| 水印区域显示拖拽手势 | 修复 `#waifu` 容器的 `pointer-events: auto` 改为 `pointer-events: none`，只让 canvas 捕获拖拽事件 |
+
+#### 安全与稳定性
+
+| 分类 | 说明 |
+|------|------|
+| Monkey-patch 机制 | 在 `core.update` 中注入叠加效果更新逻辑，确保每帧都保持水印/月卡叠加效果 |
+
+#### 文档更新
+
+| 分类 | 说明 |
+|------|------|
+| README.md | 版本变更记录新增 v2.1.0，详细说明 Live2D 表情系统修复原因和技术细节 |
+| README.md | 项目描述新增引导页功能说明 |
+
+---
+
 ### v2.0.0 (2026-05-03)
 
 > **主题**：数字人 Live2D + 语音交互集成（Golden Release）
@@ -3176,6 +3271,7 @@ cp .env.example .env
 | .gitignore | `my_yolo_web/.gitignore` 与实际文件对比：全部 5 条规则均正确（`ai_api.py` 含历史明文 Key 仍保留忽略） |
 | 命名统一 | AI 助手名统一为「火花」：涉及 `DigitalHumanAssistant.vue`、`AccAiController.java`、`app.py`、`.env`、`.env.example`、`README.md` 共 8 处 |
 | 个人水印 | 新增个人水印组件 `BrandingFooter.vue`，显示"Powered by DearJIAN"和项目名，嵌入登录页底部和全局右下角浮层 |
+| 启动脚本 | 新增 `start.bat` 一键启动脚本，同时启动 Flask (5000) + Spring Boot (8080) + Vue 前端 (5173)，每次启动自动执行 npm install 确保依赖最新 |
 
 #### 文档 (Documentation - 2026-05-03 第二轮补充)
 

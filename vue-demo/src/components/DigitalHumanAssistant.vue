@@ -1,13 +1,31 @@
 <template>
-  <div class="digital-human-layer">
-    <button class="assistant-tab" type="button" @click="panelOpen = !panelOpen">
+  <div class="digital-human-layer" :style="layerStyle">
+    <button
+      class="assistant-tab"
+      type="button"
+      @mousedown="tabDragStart"
+      @touchstart.prevent="tabDragStart"
+      @click="handleTabClick"
+    >
       <span class="assistant-tab__dot" :class="{ active: isBusy || isSpeaking || isListening }"></span>
       <span>数字人助手</span>
       <small>{{ status }}</small>
     </button>
 
-    <section v-show="panelOpen" class="assistant-panel">
-      <header class="assistant-header">
+    <section
+      v-show="panelOpen"
+      ref="panelRef"
+      class="assistant-panel"
+      :class="{ dragging: isDragging, 'is-dragged': isDragged }"
+      :style="isDragged ? {
+        position: 'fixed',
+        right: 'auto',
+        bottom: 'auto',
+        left: panelPosition.x + 'px',
+        top: panelPosition.y + 'px'
+      } : {}"
+    >
+      <header class="assistant-header" @mousedown="startDrag" @touchstart="startDrag">
         <div>
           <span class="assistant-kicker">Live2D + Voice</span>
           <h2>火花</h2>
@@ -21,6 +39,29 @@
           </el-tooltip>
         </div>
       </header>
+
+      <!-- Expression Panel -->
+      <div class="expression-panel">
+        <div class="expression-title">
+          <span>表情</span>
+          <small>水印/月卡可与其他表情共存</small>
+        </div>
+        <div class="expression-grid">
+          <button
+            v-for="exp in expressions"
+            :key="exp.name"
+            class="expression-btn"
+            :class="{ 
+              'active': isExpressionActive(exp.name),
+              'coexist': exp.coexist 
+            }"
+            :title="exp.coexist ? '可与其它表情共存' : ''"
+            @click="toggleExpression(exp.name)"
+          >
+            {{ exp.label }}
+          </button>
+        </div>
+      </div>
 
       <div class="assistant-toolbar">
         <el-tooltip :content="isListening ? '停止语音输入' : '开始语音输入'" placement="top">
@@ -99,11 +140,37 @@ const status = ref('待命')
 const modelHint = ref('正在连接数字人服务')
 const messages = ref([])
 const historyRef = ref(null)
+const panelRef = ref(null)
 const isBusy = ref(false)
 const isListening = ref(false)
 const isSpeaking = ref(false)
 const muted = ref(localStorage.getItem('digital_human_muted') === '1')
 const sessionId = ref(localStorage.getItem('digital_human_session_id') || createSessionId())
+
+// Drag state
+const isDragging = ref(false)
+const isDragged = ref(false)
+const panelPosition = ref({ x: 0, y: 0 })
+const dragOffset = ref({ x: 0, y: 0 })
+
+// Expression state
+const activeExpressions = ref(new Set(['水印'])) // Default: watermark on
+const coexistExpressions = new Set(['水印', '月卡'])
+
+const expressions = [
+  { name: '01黑脸', label: '黑脸', coexist: false },
+  { name: '02 脸红爱心', label: '脸红', coexist: false },
+  { name: '03 生气', label: '生气', coexist: false },
+  { name: '04 晕', label: '晕', coexist: false },
+  { name: '05 ＞＜', label: '＞＜', coexist: false },
+  { name: '06 0.0', label: '0.0', coexist: false },
+  { name: '07 星星眼', label: '星星眼', coexist: false },
+  { name: '08 流泪', label: '流泪', coexist: false },
+  { name: '10 捧心', label: '捧心', coexist: false },
+  { name: '11 要饭', label: '要饭', coexist: false },
+  { name: '水印', label: '水印', coexist: true },
+  { name: '月卡', label: '月卡', coexist: true },
+]
 
 let recognition = null
 let mediaRecorder = null
@@ -152,6 +219,273 @@ function getSceneName() {
 
 function shouldUseSpringAccounting() {
   return route.path.startsWith('/accounting')
+}
+
+// Expression control
+function isExpressionActive(name) {
+  return activeExpressions.value.has(name)
+}
+
+function toggleExpression(name) {
+  console.log('[Live2D] toggleExpression called:', name)
+  const isCoexist = coexistExpressions.has(name)
+  const isActive = activeExpressions.value.has(name)
+  
+  if (isCoexist) {
+    if (isActive) {
+      activeExpressions.value.delete(name)
+    } else {
+      activeExpressions.value.add(name)
+    }
+  } else {
+    if (isActive) {
+      activeExpressions.value.delete(name)
+    } else {
+      for (const exp of activeExpressions.value) {
+        if (!coexistExpressions.has(exp)) {
+          activeExpressions.value.delete(exp)
+        }
+      }
+      activeExpressions.value.add(name)
+    }
+  }
+  
+  console.log('[Live2D] activeExpressions after toggle:', Array.from(activeExpressions.value))
+  applyExpressions()
+}
+
+// ============================================================
+// Live2D 核心辅助函数（参考成功项目实现）
+// ============================================================
+
+function getCurrentCubism5Model() {
+  const manager = window.__live2dWidgetModelManager
+  const appDelegate = manager?.cubism5model
+  const subdelegate = appDelegate?.subdelegates?.at?.(0)
+  const live2dManager = subdelegate?.getLive2DManager?.()
+  const model = live2dManager?._models?.at?.(0) || null
+  console.log('[Live2D] getCurrentCubism5Model:', model ? 'found' : 'not found')
+  return model
+}
+
+function getModelTargets(target) {
+  const seen = new Set()
+  const out = []
+  const push = (x) => {
+    if (!x || seen.has(x)) return
+    seen.add(x)
+    out.push(x)
+  }
+  push(target)
+  push(target?._model)
+  push(target?._model?._model)
+  push(target?.model)
+  push(target?.model?._model)
+  push(target?.model?._model?._model)
+  return out
+}
+
+function idToString(idObj) {
+  try {
+    if (!idObj) return ''
+    if (typeof idObj === 'string') return idObj
+    if (typeof idObj.getString === 'function') {
+      const s = idObj.getString()
+      if (typeof s === 'string') return s
+      if (s && typeof s.s === 'string') return s.s
+    }
+    if (typeof idObj.s === 'string') return idObj.s
+  } catch (_) {}
+  return ''
+}
+
+function getCubismCoreModel(target) {
+  const targets = getModelTargets(target)
+  for (const current of targets) {
+    if (current?._parameterIds?.getSize && current?._parameterIds?.at) {
+      return current
+    }
+  }
+  return null
+}
+
+function resolveParamIdObject(core, paramId) {
+  try {
+    const ids = core?._parameterIds
+    if (!ids?.getSize || !ids?.at) return null
+    for (let i = 0; i < ids.getSize(); i += 1) {
+      const idObj = ids.at(i)
+      if (idToString(idObj) === paramId) return idObj
+    }
+  } catch (_) {}
+  return null
+}
+
+function resolvePartIdObject(core, partId) {
+  try {
+    const ids = core?._partIds
+    if (!ids?.getSize || !ids?.at) return null
+    for (let i = 0; i < ids.getSize(); i += 1) {
+      const idObj = ids.at(i)
+      if (idToString(idObj) === partId) return idObj
+    }
+  } catch (_) {}
+  return null
+}
+
+// 兼容旧代码的 getModel 函数
+function getModel() {
+  return getCurrentCubism5Model()
+}
+
+// 表情 overlay 规则
+const overlayRules = {
+  '月卡': { parameters: ['key9'], parts: [] },
+  '水印': { parameters: ['key12', 'Param45', 'Param48', 'Param49', 'Param50'], parts: [] }
+}
+
+// 应用 overlay 状态到 core model
+function applyOverlayStateToCore(core) {
+  if (!core) return
+
+  const activeOv = activeExpressions.value
+  const allParameterIds = new Set()
+  const allPartIds = new Set()
+  
+  for (const rule of Object.values(overlayRules)) {
+    const parameters = rule?.parameters || []
+    const parts = rule?.parts || []
+    for (const parameterId of parameters) allParameterIds.add(parameterId)
+    for (const partId of parts) allPartIds.add(partId)
+  }
+
+  for (const parameterId of allParameterIds) {
+    const shouldEnable = [...activeOv].some((overlayName) => {
+      return overlayRules[overlayName]?.parameters?.includes(parameterId)
+    })
+
+    const idObj = resolveParamIdObject(core, parameterId)
+    if (!idObj) continue
+    if (typeof core.getParameterIndex !== 'function' || typeof core.setParameterValueByIndex !== 'function') continue
+
+    const idx = core.getParameterIndex(idObj)
+    if (idx >= 0) {
+      core.setParameterValueByIndex(idx, shouldEnable ? 1 : 0, 1)
+    }
+  }
+
+  for (const partId of allPartIds) {
+    const shouldEnable = [...activeOv].some((overlayName) => {
+      return overlayRules[overlayName]?.parts?.includes(partId)
+    })
+
+    const idObj = resolvePartIdObject(core, partId)
+    if (!idObj || typeof core.getPartIndex !== 'function' || typeof core.setPartOpacityByIndex !== 'function') continue
+
+    const idx = core.getPartIndex(idObj)
+    if (idx >= 0) {
+      core.setPartOpacityByIndex(idx, shouldEnable ? 1 : 0)
+    }
+  }
+}
+
+// 应用 overlay 状态到 model
+function applyOverlayState(model) {
+  if (!model) return
+  const core = getCubismCoreModel(model)
+  applyOverlayStateToCore(core)
+}
+
+// Monkey-patch core.update 实现 overlay 持续生效
+function setupExpressionWithOverlay() {
+  const model = getCurrentCubism5Model()
+  if (!model || model.__expressionOverlayPatched) return
+
+  const core = getCubismCoreModel(model)
+
+  if (core && typeof core.update === 'function' && !core.__overlayUpdatePatched) {
+    const oldCoreUpdate = core.update.bind(core)
+    core.update = function(...args) {
+      try {
+        applyOverlayStateToCore(core)
+      } catch (error) {}
+      const result = oldCoreUpdate(...args)
+      return result
+    }
+    core.__overlayUpdatePatched = true
+    console.log('[Live2D] Monkey-patch core.update success')
+  }
+
+  model.__expressionOverlayPatched = true
+}
+
+let _cubismModelRef = null
+let _cubismPollingActive = false
+
+// ============================================================
+// Expression control
+// ============================================================
+function applyExpressions() {
+  const expArray = Array.from(activeExpressions.value)
+  console.log('[Live2D] applyExpressions called with:', expArray)
+  
+  const model = getCurrentCubism5Model()
+
+  if (!model) {
+    console.warn('[Live2D] CubismModel not available yet')
+    return
+  }
+
+  try {
+    const mgr = window.__live2dWidgetModelManager
+    const isCubism5 = mgr?.currentModelVersion === 3 || !!mgr?.cubism5model
+    console.log('[Live2D] Model version:', isCubism5 ? 'Cubism5' : 'Cubism2')
+
+    // 获取当前的基础表情（非叠加效果）
+    const baseExpression = expArray.find(exp => !coexistExpressions.has(exp))
+    
+    if (isCubism5) {
+      // 步骤1：重置表情相关参数（防止表情残留导致眼睛闪烁）
+      const core = getCubismCoreModel(model)
+      if (core) {
+        const expressionParams = ['ParamEyeSmile', 'ParamEyeOpen', 'ParamTear']
+        expressionParams.forEach(paramName => {
+          const paramId = resolveParamIdObject(core, paramName)
+          if (paramId) {
+            const idx = core.getParameterIndex(paramId)
+            if (idx >= 0) {
+              core.setParameterValueByIndex(idx, 0, 1)
+            }
+          }
+        })
+      }
+      
+      // 步骤2：设置基础表情
+      if (baseExpression && typeof model.setExpression === 'function') {
+        console.log('[Live2D] Setting base expression:', baseExpression)
+        model.setExpression(baseExpression)
+      }
+      
+      // 步骤3：应用叠加效果
+      applyOverlayState(model)
+    } else {
+      // Cubism 2: 使用 expression 方法
+      if (typeof model.expression === 'function') {
+        model.expression(-1)
+        expArray.forEach(expName => {
+          const idx = model.expressions?.findIndex(e => e.name === expName)
+          if (idx >= 0) model.expression(idx)
+        })
+      }
+    }
+
+    console.log('[Live2D] Expressions applied successfully:', expArray)
+    window.__live2dExpressionUpdateTime = Date.now()
+  } catch (e) {
+    console.error('[Live2D] Expression apply failed:', e)
+  }
+
+  notifyLive2d('onExpressionChange', { expressions: expArray })
 }
 
 async function sendMessage(raw = draft.value) {
@@ -420,6 +754,34 @@ async function initLive2d() {
         logLevel: 'warn'
       })
       installLive2dGuards()
+      
+      // 监听模型就绪事件
+      const onModelReady = () => {
+        console.log('[Live2D] Model ready event received')
+        
+        // 等待模型完全加载
+        let attempts = 0
+        const maxAttempts = 50
+        const checkModel = () => {
+          attempts++
+          const model = getCurrentCubism5Model()
+          if (model) {
+            console.log('[Live2D] Model found, setting up overlay...')
+            setupExpressionWithOverlay()
+            applyExpressions()
+          } else if (attempts < maxAttempts) {
+            setTimeout(checkModel, 200)
+          } else {
+            console.warn('[Live2D] Model not found after', maxAttempts, 'attempts')
+          }
+        }
+        setTimeout(checkModel, 500)
+      }
+      window.addEventListener('live2d:model-ready', onModelReady)
+
+      window.__live2dCleanup = () => {
+        window.removeEventListener('live2d:model-ready', onModelReady)
+      }
     }, 300)
   } catch (error) {
     console.warn(error)
@@ -464,6 +826,10 @@ onBeforeUnmount(() => {
   stopListening(false)
   stopSpeech()
   cleanupMedia()
+  document.removeEventListener('mousemove', tabOnDrag)
+  document.removeEventListener('mouseup', tabStopDrag)
+  document.removeEventListener('touchmove', tabOnDrag)
+  document.removeEventListener('touchend', tabStopDrag)
 })
 
 function handleExternalOpen(event) {
@@ -472,6 +838,152 @@ function handleExternalOpen(event) {
   if (prompt) {
     sendMessage(prompt)
   }
+}
+
+// Panel drag functionality
+function startDrag(event) {
+  if (!panelRef.value) return
+  
+  // Switch to fixed positioning on first drag
+  if (!isDragged.value) {
+    const rect = panelRef.value.getBoundingClientRect()
+    panelPosition.value = { x: rect.left, y: rect.top }
+    isDragged.value = true
+    // Wait a tick for fixed position to apply
+    requestAnimationFrame(() => {
+      dragStartCore(event)
+    })
+    return
+  }
+  
+  dragStartCore(event)
+}
+
+function dragStartCore(event) {
+  if (!panelRef.value) return
+  
+  isDragging.value = true
+  const clientX = event.type.includes('touch') ? event.touches[0].clientX : event.clientX
+  const clientY = event.type.includes('touch') ? event.touches[0].clientY : event.clientY
+  
+  dragOffset.value = {
+    x: clientX - panelPosition.value.x,
+    y: clientY - panelPosition.value.y
+  }
+  
+  document.addEventListener('mousemove', onDrag)
+  document.addEventListener('mouseup', stopDrag)
+  document.addEventListener('touchmove', onDrag)
+  document.addEventListener('touchend', stopDrag)
+}
+
+function onDrag(event) {
+  if (!isDragging.value) return
+  
+  event.preventDefault()
+  const clientX = event.type.includes('touch') ? event.touches[0].clientX : event.clientX
+  const clientY = event.type.includes('touch') ? event.touches[0].clientY : event.clientY
+  
+  const newX = clientX - dragOffset.value.x
+  const newY = clientY - dragOffset.value.y
+  
+  const panel = panelRef.value
+  const panelWidth = panel?.offsetWidth || 420
+  const panelHeight = panel?.offsetHeight || 600
+  
+  const maxX = window.innerWidth - panelWidth
+  const maxY = window.innerHeight - panelHeight
+  
+  panelPosition.value = {
+    x: Math.max(0, Math.min(newX, maxX)),
+    y: Math.max(0, Math.min(newY, maxY))
+  }
+}
+
+function stopDrag() {
+  isDragging.value = false
+  document.removeEventListener('mousemove', onDrag)
+  document.removeEventListener('mouseup', stopDrag)
+  document.removeEventListener('touchmove', onDrag)
+  document.removeEventListener('touchend', stopDrag)
+}
+
+// ============================================
+// Assistant tab drag
+// ============================================
+const tabPosition = ref({ x: 0, y: 0 })
+const isTabDragged = ref(false)
+const tabDragging = ref(false)
+const tabDragOffset = ref({ x: 0, y: 0 })
+let tabMoved = false
+
+const layerStyle = computed(() => {
+  if (!isTabDragged.value) return {}
+  return {
+    position: 'fixed',
+    left: tabPosition.value.x + 'px',
+    top: tabPosition.value.y + 'px',
+    right: 'auto',
+    bottom: 'auto'
+  }
+})
+
+function tabDragStart(event) {
+  tabMoved = false
+
+  // Capture current position on first drag
+  if (!isTabDragged.value) {
+    const layer = document.querySelector('.digital-human-layer')
+    if (layer) {
+      const rect = layer.getBoundingClientRect()
+      tabPosition.value = { x: rect.left, y: rect.top }
+      isTabDragged.value = true
+    }
+  }
+
+  const clientX = event.type.includes('touch') ? event.touches[0].clientX : event.clientX
+  const clientY = event.type.includes('touch') ? event.touches[0].clientY : event.clientY
+
+  tabDragOffset.value = {
+    x: clientX - tabPosition.value.x,
+    y: clientY - tabPosition.value.y
+  }
+
+  tabDragging.value = true
+  document.addEventListener('mousemove', tabOnDrag)
+  document.addEventListener('mouseup', tabStopDrag)
+  document.addEventListener('touchmove', tabOnDrag, { passive: false })
+  document.addEventListener('touchend', tabStopDrag)
+}
+
+function tabOnDrag(event) {
+  if (!tabDragging.value) return
+  event.preventDefault()
+
+  const clientX = event.type.includes('touch') ? event.touches[0].clientX : event.clientX
+  const clientY = event.type.includes('touch') ? event.touches[0].clientY : event.clientY
+
+  const dx = clientX - tabDragOffset.value.x - tabPosition.value.x
+  const dy = clientY - tabDragOffset.value.y - tabPosition.value.y
+  if (Math.abs(dx) > 3 || Math.abs(dy) > 3) tabMoved = true
+
+  tabPosition.value = {
+    x: Math.max(0, Math.min(clientX - tabDragOffset.value.x, window.innerWidth - 150)),
+    y: Math.max(0, Math.min(clientY - tabDragOffset.value.y, window.innerHeight - 50))
+  }
+}
+
+function tabStopDrag() {
+  tabDragging.value = false
+  document.removeEventListener('mousemove', tabOnDrag)
+  document.removeEventListener('mouseup', tabStopDrag)
+  document.removeEventListener('touchmove', tabOnDrag)
+  document.removeEventListener('touchend', tabStopDrag)
+}
+
+function handleTabClick() {
+  if (tabMoved) return
+  panelOpen.value = !panelOpen.value
 }
 </script>
 
@@ -501,8 +1013,13 @@ function handleExternalOpen(event) {
   background: #ffffff;
   color: #1f2d3d;
   box-shadow: 0 10px 26px rgba(15, 23, 42, 0.16);
-  cursor: pointer;
+  cursor: grab;
   font-weight: 700;
+  user-select: none;
+}
+
+.assistant-tab:active {
+  cursor: grabbing;
 }
 
 .assistant-tab small {
@@ -527,7 +1044,7 @@ function handleExternalOpen(event) {
   right: 0;
   bottom: 54px;
   width: min(420px, calc(100vw - 32px));
-  max-height: min(680px, calc(100vh - 104px));
+  max-height: min(720px, calc(100vh - 104px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -544,6 +1061,17 @@ function handleExternalOpen(event) {
   gap: 12px;
   padding: 18px 18px 14px;
   border-bottom: 1px solid #edf2f7;
+  cursor: move;
+  user-select: none;
+}
+
+.assistant-header:active {
+  cursor: grabbing;
+}
+
+.assistant-panel.dragging {
+  opacity: 0.9;
+  box-shadow: 0 25px 60px rgba(15, 23, 42, 0.3);
 }
 
 .assistant-kicker {
@@ -567,6 +1095,79 @@ function handleExternalOpen(event) {
   color: #64748b;
   font-size: 12px;
   line-height: 1.45;
+}
+
+/* Expression Panel Styles */
+.expression-panel {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf2f7;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.03), rgba(16, 185, 129, 0.03));
+}
+
+.expression-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.expression-title small {
+  font-size: 10px;
+  font-weight: 400;
+  color: #94a3b8;
+  background: rgba(99, 102, 241, 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.expression-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 6px;
+}
+
+.expression-btn {
+  padding: 6px 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fff;
+  color: #64748b;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.expression-btn:hover {
+  border-color: #409eff;
+  color: #409eff;
+  transform: translateY(-1px);
+}
+
+.expression-btn.active {
+  background: linear-gradient(135deg, #409eff, #60a5fa);
+  border-color: #409eff;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.expression-btn.coexist {
+  border-style: dashed;
+  border-color: #a78bfa;
+  color: #7c3aed;
+}
+
+.expression-btn.coexist.active {
+  background: linear-gradient(135deg, #a78bfa, #c4b5fd);
+  border-color: #a78bfa;
+  border-style: solid;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(167, 139, 250, 0.3);
 }
 
 .icon-button,
@@ -644,8 +1245,8 @@ function handleExternalOpen(event) {
 }
 
 .assistant-history {
-  min-height: 160px;
-  max-height: 290px;
+  min-height: 140px;
+  max-height: 240px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -754,6 +1355,10 @@ function handleExternalOpen(event) {
     bottom: 50px;
     width: calc(100vw - 24px);
     max-height: calc(100vh - 86px);
+  }
+
+  .expression-grid {
+    grid-template-columns: repeat(4, 1fr);
   }
 
   .assistant-toolbar {

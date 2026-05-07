@@ -39,7 +39,7 @@ manual_load_env()
 # ============================================================
 # Flask 与应用初始化
 # ============================================================
-from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context
+from flask import Flask, Response, jsonify, request, send_from_directory, stream_with_context, render_template
 from flask_cors import CORS
 
 from web_inference import WebDetector
@@ -404,11 +404,7 @@ def _stream_text_model(queue, question, scene_name, session_id):
 # ============================================================
 @app.route('/')
 def index():
-    return jsonify({
-        "service": "LEAR-CODE Flask Backend",
-        "modules": ["YOLO detection", "AI chat", "Voice ASR", "TTS"],
-        "version": "2.0.0"
-    })
+    return render_template('index.html')
 
 
 @app.route('/video_feed')

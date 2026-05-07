@@ -71,8 +71,60 @@
       </el-container>
     </el-container>
     <DigitalHumanAssistant />
+    <GuideTour />
 
-    <BrandingFooter class="app-branding" variant="light" />
+    <!-- ============================================ -->
+    <!-- YOLO AI Vision Button (global fixed position) -->
+    <!-- ============================================ -->
+    <div v-if="showYoloButton" class="ai-vision-launcher" @click="openYoloSystem">
+      <div class="launcher-ball">
+        <i-tabler-eye class="ai-icon" />
+        <span class="label">AI 视觉</span>
+      </div>
+      <div class="launcher-tooltip">点击进入 AI 视觉识别子系统</div>
+    </div>
+
+    <!-- YOLO Dialog -->
+    <div v-if="yoloVisible" class="custom-dialog-overlay" v-show="!yoloMinimized">
+      <div class="custom-dialog" ref="yoloDialogRef">
+        <div class="custom-dialog-header" @mousedown="startYoloDrag">
+          <span>AI 视觉识别子系统 (实时监控)</span>
+          <div class="custom-dialog-actions">
+            <button class="dialog-btn minimize-btn" @click="handleYoloMinimize" title="最小化">
+              <el-icon><Minus /></el-icon>
+            </button>
+            <button class="dialog-btn close-btn" @click="handleYoloDialogClose" title="关闭">
+              <el-icon><Close /></el-icon>
+            </button>
+          </div>
+        </div>
+        <div class="custom-dialog-body">
+          <iframe
+            src="http://localhost:5000"
+            frameborder="0"
+            class="custom-iframe"
+            allow="autoplay; camera"
+          ></iframe>
+        </div>
+      </div>
+    </div>
+
+    <!-- YOLO Minimized float -->
+    <div v-if="yoloVisible && yoloMinimized" class="yolo-floating-window">
+      <div class="yolo-floating-header">
+        <span>YOLO运行中</span>
+        <div class="yolo-floating-actions">
+          <button class="dialog-btn restore-btn" @click="handleYoloMinimize" title="恢复">
+            <el-icon><FullScreen /></el-icon>
+          </button>
+          <button class="dialog-btn close-btn" @click="handleYoloDialogClose" title="关闭">
+            <el-icon><Close /></el-icon>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <BrandingFooter v-if="!isLoginPage" class="app-branding" variant="light" />
   </div>
 </template>
 
@@ -83,13 +135,17 @@ import { ElMessage } from 'element-plus'
 import { logout } from '@/api/accounting'
 import DigitalHumanAssistant from '@/components/DigitalHumanAssistant.vue'
 import BrandingFooter from '@/components/BrandingFooter.vue'
-import { watch, onMounted } from 'vue'
+import GuideTour from '@/components/GuideTour.vue'
+import { ref, watch, onMounted, computed } from 'vue'
+import { Minus, Close, FullScreen } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const route = useRoute()
 
 const appLoadTime = performance.now()
 console.log('=== App.vue 组件加载 ===', '时间戳:', appLoadTime.toFixed(2))
+
+const isLoginPage = computed(() => route.path === '/login')
 
 onMounted(() => {
   const mountTime = performance.now()
@@ -111,6 +167,75 @@ const handleSidebarLogout = async () => {
   ElMessage.success('已退出登录')
   router.push('/login')
 }
+
+// ============================================
+// YOLO AI Vision System (global, outside router-view)
+// ============================================
+const yoloVisible = ref(false)
+const yoloMinimized = ref(false)
+
+const openYoloSystem = () => {
+  yoloVisible.value = true
+}
+
+const handleYoloDialogClose = () => {
+  yoloVisible.value = false
+  yoloMinimized.value = false
+}
+
+const handleYoloMinimize = () => {
+  yoloMinimized.value = !yoloMinimized.value
+  if (yoloMinimized.value) {
+    ElMessage.success('YOLO子系统已最小化，将在后台继续运行')
+  }
+}
+
+// YOLO dialog drag
+const yoloDialogRef = ref(null)
+const yoloDragging = ref(false)
+const yoloDragStart = ref({ x: 0, y: 0 })
+const yoloDialogStart = ref({ x: 0, y: 0 })
+
+const startYoloDrag = (e) => {
+  if (e.target.closest('.custom-dialog-actions')) return
+  yoloDragging.value = true
+  yoloDragStart.value = { x: e.clientX, y: e.clientY }
+  const el = yoloDialogRef.value
+  if (el) {
+    const rect = el.getBoundingClientRect()
+    yoloDialogStart.value = { x: rect.left, y: rect.top }
+  }
+  document.addEventListener('mousemove', onYoloDrag)
+  document.addEventListener('mouseup', stopYoloDrag)
+}
+
+const onYoloDrag = (e) => {
+  if (!yoloDragging.value || !yoloDialogRef.value) return
+  const dx = e.clientX - yoloDragStart.value.x
+  const dy = e.clientY - yoloDragStart.value.y
+  const el = yoloDialogRef.value
+  el.style.left = `${yoloDialogStart.value.x + dx}px`
+  el.style.top = `${yoloDialogStart.value.y + dy}px`
+  el.style.margin = '0'
+  el.style.transform = 'none'
+}
+
+const stopYoloDrag = () => {
+  yoloDragging.value = false
+  document.removeEventListener('mousemove', onYoloDrag)
+  document.removeEventListener('mouseup', stopYoloDrag)
+}
+
+const yoloOnUnmounted = () => {
+  document.removeEventListener('mousemove', onYoloDrag)
+  document.removeEventListener('mouseup', stopYoloDrag)
+}
+
+// Check route to show YOLO button
+const showYoloButton = ref(false)
+watch(route, (r) => {
+  showYoloButton.value = r.path === '/dashboard'
+}, { immediate: true })
 </script>
 
 <style>
@@ -227,5 +352,254 @@ body {
 .fade-enter-from,
 .fade-leave-to {
   opacity: 0;
+}
+
+/* ============================================ */
+/* AI Vision Button - Fixed Position (Global) */
+/* ============================================ */
+.ai-vision-launcher {
+  position: fixed;
+  right: 40px;
+  bottom: 130px;
+  z-index: 99999;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.ai-vision-launcher:hover .launcher-tooltip {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+.launcher-tooltip {
+  position: absolute;
+  right: 70px;
+  top: 50%;
+  transform: translateY(-50%) translateX(10px);
+  background: rgba(0, 0, 0, 0.75);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  white-space: nowrap;
+  opacity: 0;
+  transition: all 0.3s ease;
+  pointer-events: none;
+}
+
+.launcher-ball {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #00c6ff 0%, #0072ff 100%);
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 4px 15px rgba(0, 114, 255, 0.3);
+  border: 2px solid rgba(0, 198, 255, 0.4);
+  transition: all 0.3s;
+  animation: ai-pulse-blue 2s infinite;
+}
+
+.launcher-ball:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(0, 114, 255, 0.5);
+  border-color: #00c6ff;
+}
+
+.launcher-ball .label {
+  font-size: 10px;
+  margin-top: 2px;
+  font-weight: bold;
+}
+
+.launcher-ball .ai-icon {
+  font-size: 24px;
+  margin-bottom: 2px;
+}
+
+@keyframes ai-pulse-blue {
+  0% { box-shadow: 0 0 0 0 rgba(0, 198, 255, 0.4); }
+  70% { box-shadow: 0 0 0 15px rgba(0, 198, 255, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 198, 255, 0); }
+}
+
+/* ============================================ */
+/* YOLO Dialog Styles (Global) */
+/* ============================================ */
+.custom-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  z-index: 99998;
+}
+
+.custom-dialog {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  min-width: 800px;
+  min-height: 600px;
+  max-width: 95vw;
+  max-height: 95vh;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  cursor: move;
+  height: 80vh;
+}
+
+.custom-dialog-header {
+  padding: 10px 20px;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: move;
+}
+
+.custom-dialog-header span {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.custom-dialog-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.dialog-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  background-color: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 16px;
+  transition: all 0.3s;
+}
+
+.minimize-btn { color: #409eff; }
+.minimize-btn:hover { background-color: rgba(64, 158, 255, 0.1); color: #66b1ff; }
+.close-btn { color: #f56c6c; }
+.close-btn:hover { background-color: rgba(245, 108, 108, 0.1); color: #f78989; }
+.restore-btn { color: #67c23a; }
+.restore-btn:hover { background-color: rgba(103, 194, 58, 0.1); color: #85ce61; }
+
+.custom-dialog-body {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+  min-height: 500px;
+}
+
+.custom-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+  min-height: 500px;
+}
+
+.custom-dialog::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  cursor: se-resize;
+  background: linear-gradient(135deg, transparent 50%, rgba(0, 0, 0, 0.5) 50%);
+  pointer-events: auto;
+  z-index: 10;
+}
+
+/* Minimized float */
+.yolo-floating-window {
+  position: fixed;
+  bottom: 40px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 200px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  z-index: 99998;
+}
+
+.yolo-floating-header {
+  padding: 10px 15px;
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.yolo-floating-header span {
+  font-size: 14px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.yolo-floating-actions {
+  display: flex;
+  gap: 5px;
+}
+
+/* ============================================ */
+/* Live2D Widget Drag Support */
+/* ============================================ */
+#waifu {
+  pointer-events: none !important;
+}
+
+#waifu canvas {
+  pointer-events: auto !important;
+  cursor: grab;
+}
+
+#waifu canvas:active {
+  cursor: grabbing;
+}
+
+#live2d {
+  pointer-events: auto !important;
+  cursor: grab;
+}
+
+/* ============================================ */
+/* Global Branding Footer */
+/* ============================================ */
+.app-branding {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 10000;
+  background: linear-gradient(to top, rgba(255, 255, 255, 0.95), rgba(255, 255, 255, 0.8));
+  backdrop-filter: blur(4px);
+  padding: 8px 0 6px;
+  border-top: 1px solid rgba(99, 102, 241, 0.1);
+  pointer-events: auto;
+}
+
+.app-branding a {
+  pointer-events: auto;
 }
 </style>

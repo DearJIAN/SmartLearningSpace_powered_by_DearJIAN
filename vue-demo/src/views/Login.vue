@@ -64,6 +64,13 @@
           </el-form-item>
         </el-form>
 
+        <div class="demo-account" v-if="isLogin">
+          <el-button type="info" text size="small" @click="fillDemoAccount">
+            <i-tabler-user-check style="margin-right:4px" />
+            使用示例账号
+          </el-button>
+        </div>
+
         <div class="foot">
           <span v-if="isLogin">还没有账号？</span>
           <span v-else>已有账户？</span>
@@ -175,6 +182,16 @@ const handleRegister = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// 填充示例账号
+const fillDemoAccount = async () => {
+  form.value.username = 'root'
+  form.value.password = '1234'
+  ElMessage.info('已填写示例账号，正在自动登录...')
+  
+  // 自动登录
+  await handleLogin()
 }
 </script>
 
@@ -292,6 +309,21 @@ const handleRegister = async () => {
 
 .pwd-toggle:focus {
   outline: none !important;
+}
+
+/* 示例账号按钮样式 */
+.demo-account {
+  text-align: center;
+  margin: 16px 0 8px;
+}
+
+.demo-account :deep(.el-button) {
+  color: #667eea;
+  font-size: 13px;
+}
+
+.demo-account :deep(.el-button:hover) {
+  color: #764ba2;
 }
 
 /* 优化输入框样式和交互效果 */

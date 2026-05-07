@@ -31,6 +31,9 @@ export default defineConfig({
     },
   },
   server: {
+    headers: {
+      'Content-Security-Policy': "script-src 'self' 'unsafe-eval' 'unsafe-inline';"
+    },
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
