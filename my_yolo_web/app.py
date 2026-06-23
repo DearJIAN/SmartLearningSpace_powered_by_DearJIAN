@@ -199,6 +199,11 @@ def extract_answer_fragment(value):
             fragment = extract_answer_fragment(value.get("text"))
             if fragment:
                 return fragment
+    
+    # Handle objects
+    value_type = str(getattr(value, "type", getattr(value, "role", ""))).strip().lower()
+    if value_type in {"reasoning", "thinking", "tool_call", "tool_result"}:
+        return ""
         if "delta" in value:
             fragment = extract_answer_fragment(value.get("delta"))
             if fragment:
@@ -217,7 +222,7 @@ def extract_answer_fragment(value):
             if fragment:
                 return fragment
         return ""
-    for attr in ("delta", "text", "output_text", "content", "choices", "message"):
+    for attr in ("delta", "text", "output_text", "content", "choices", "message", "output"):
         fragment = extract_answer_fragment(getattr(value, attr, None))
         if fragment:
             return fragment
