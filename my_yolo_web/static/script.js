@@ -235,18 +235,48 @@ async function sendMessage() {
     let fullMarkdownText = "";
     let isFirstChunk = true;
     try {
-        const response = await fetch('/api/chat', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({message: msg}) });
-        const reader = response.body.getReader();
+        const response = await fetch('/api/chat/stream', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({message: msg})
+        });
+        if (!response.ok) {
+            const detail = await response.text().catch(() => '');
+            throw new Error(detail || `HTTP ${response.status}`);
+        }
+        const reader = response.body?.getReader();
+        if (!reader) {
+            throw new Error('当前浏览器不支持流式响应');
+        }
         const decoder = new TextDecoder("utf-8");
+        let buffer = "";
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            if (isFirstChunk) { botMsgDiv.classList.remove('loading-rainbow'); botMsgDiv.innerHTML = ""; isFirstChunk = false; }
-            const chunk = decoder.decode(value, {stream: true});
-            fullMarkdownText += chunk;
-            botMsgDiv.innerHTML = marked.parse(fullMarkdownText);
-            const body = document.getElementById('chatBody');
-            body.scrollTop = body.scrollHeight;
+            buffer += decoder.decode(value, {stream: true});
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || "";
+            for (const raw of lines) {
+                const line = raw.trim();
+                if (!line || line.startsWith('sessionId:') || line.startsWith('done:')) continue;
+                if (line.startsWith('error:')) {
+                    throw new Error(line.slice('error:'.length).trim() || 'AI 回复失败');
+                }
+                if (!line.startsWith('delta:')) continue;
+                if (isFirstChunk) {
+                    botMsgDiv.classList.remove('loading-rainbow');
+                    botMsgDiv.innerHTML = "";
+                    isFirstChunk = false;
+                }
+                fullMarkdownText += line.slice('delta:'.length);
+                botMsgDiv.innerHTML = marked.parse(fullMarkdownText);
+                const body = document.getElementById('chatBody');
+                body.scrollTop = body.scrollHeight;
+            }
+        }
+        if (isFirstChunk) {
+            botMsgDiv.classList.remove('loading-rainbow');
+            botMsgDiv.innerHTML = marked.parse('我刚刚没有组织出合适的回答，你可以换个方式再问一次。');
         }
     } catch (err) {
         botMsgDiv.classList.remove('loading-rainbow');

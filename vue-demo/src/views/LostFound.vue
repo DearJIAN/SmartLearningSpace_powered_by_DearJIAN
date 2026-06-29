@@ -714,6 +714,8 @@ onMounted(() => {
 onUnmounted(() => {
   stopRealTimeUpdate()
   stopYoloDetectionTimer()
+  document.removeEventListener('mousemove', handleDrag)
+  document.removeEventListener('mouseup', stopDrag)
 })
 </script>
 
@@ -872,7 +874,8 @@ onUnmounted(() => {
   bottom: 0;
   background-color: rgba(0, 0, 0, 0.5);
   display: block;
-  z-index: 1000;
+  z-index: 99998;
+  pointer-events: auto;
 }
 
 .custom-dialog {
@@ -1019,8 +1022,9 @@ onUnmounted(() => {
   background-color: white;
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
-  z-index: 1000;
+  z-index: 99998;
   cursor: move;
+  pointer-events: auto;
 }
 
 /* 浮动窗口头部 */

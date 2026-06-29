@@ -599,7 +599,23 @@ function stopSpeech() {
 function toggleMute() {
   muted.value = !muted.value
   localStorage.setItem('digital_human_muted', muted.value ? '1' : '0')
-  if (muted.value) stopSpeech()
+  
+  if (!window.speechSynthesis) return
+  
+  if (muted.value) {
+    if (isSpeaking.value) {
+      window.speechSynthesis.pause()
+    }
+  } else {
+    if (window.speechSynthesis.paused) {
+      window.speechSynthesis.resume()
+    } else if (!isSpeaking.value && !isBusy.value) {
+      const latest = [...messages.value].reverse().find(m => m.role === 'assistant')
+      if (latest && latest.text) {
+        speak(latest.text)
+      }
+    }
+  }
 }
 
 function resetSession() {

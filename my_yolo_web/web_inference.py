@@ -40,6 +40,19 @@ class WebDetector:
             "save_crop": False
         }
 
+    def reset_run_state(self):
+        self.is_running = False
+        self.is_paused = False
+        self.stop_event = False
+
+    def stop(self):
+        self.stop_event = True
+        self.is_paused = False
+
+    def prepare_run(self):
+        self.is_paused = False
+        self.stop_event = False
+
     def clear_results(self):
         with self.results_lock:
             self.recent_results = []

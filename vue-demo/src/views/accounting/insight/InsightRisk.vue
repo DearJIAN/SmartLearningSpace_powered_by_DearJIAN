@@ -13,7 +13,7 @@
       <el-button type="danger" plain size="small" @click="fetchData">重新扫描</el-button>
     </div>
 
-    <div class="risk-grid">
+    <div v-if="riskItems.length > 0" class="risk-grid">
       <div v-for="(risk, index) in riskItems" :key="index" class="risk-card" :class="risk.level">
          <div class="card-glow"></div>
          <div class="risk-header">
@@ -29,8 +29,17 @@
             <el-button type="primary" link @click="handleFix(risk)">查看解决建议</el-button>
          </div>
       </div>
+    </div>
 
-      <el-empty v-if="riskItems.length === 0" description="恭喜！未检测到任何财务风险异常" />
+    <div v-else class="risk-empty-state">
+      <el-empty :image-size="180">
+        <template #description>
+          <div class="risk-empty-copy">
+            <h3>恭喜！未检测到任何财务风险异常</h3>
+            <p>当前账单与预算表现稳定，暂时没有需要优先处理的风险项。</p>
+          </div>
+        </template>
+      </el-empty>
     </div>
   </div>
 </template>
@@ -108,6 +117,34 @@ const handleFix = (risk) => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
   gap: 20px;
+}
+
+.risk-empty-state {
+  min-height: 58vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 0 40px;
+}
+
+.risk-empty-copy {
+  text-align: center;
+  max-width: 520px;
+}
+
+.risk-empty-copy h3 {
+  margin: 12px 0 10px;
+  font-size: 30px;
+  line-height: 1.25;
+  color: #1e293b;
+  font-weight: 800;
+}
+
+.risk-empty-copy p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #64748b;
 }
 
 .risk-card {

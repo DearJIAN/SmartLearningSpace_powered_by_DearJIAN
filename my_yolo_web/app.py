@@ -199,11 +199,6 @@ def extract_answer_fragment(value):
             fragment = extract_answer_fragment(value.get("text"))
             if fragment:
                 return fragment
-    
-    # Handle objects
-    value_type = str(getattr(value, "type", getattr(value, "role", ""))).strip().lower()
-    if value_type in {"reasoning", "thinking", "tool_call", "tool_result"}:
-        return ""
         if "delta" in value:
             fragment = extract_answer_fragment(value.get("delta"))
             if fragment:
@@ -221,6 +216,15 @@ def extract_answer_fragment(value):
             fragment = extract_answer_fragment(value.get("message"))
             if fragment:
                 return fragment
+        if "output" in value:
+            fragment = extract_answer_fragment(value.get("output"))
+            if fragment:
+                return fragment
+        return ""
+
+    # Handle objects
+    value_type = str(getattr(value, "type", getattr(value, "role", ""))).strip().lower()
+    if value_type in {"reasoning", "thinking", "tool_call", "tool_result"}:
         return ""
     for attr in ("delta", "text", "output_text", "content", "choices", "message", "output"):
         fragment = extract_answer_fragment(getattr(value, attr, None))
@@ -442,7 +446,7 @@ def list_examples():
 
 @app.route('/api/start', methods=['POST'])
 def start_detection():
-    data = request.json
+    data = request.get_json(silent=True) or {}
     model_input = data.get('model_name', '').strip()
     if os.path.sep in model_input or '/' in model_input:
         full_model_path = model_input
@@ -462,8 +466,15 @@ def start_detection():
         "save_conf": data.get('save_conf', False),
         "save_crop": data.get('save_crop', False)
     }
+
+    detector.prepare_run()
     detector.update_params(params)
-    return jsonify({"status": "started"})
+    return jsonify({
+        "status": "started",
+        "is_running": detector.is_running,
+        "is_paused": detector.is_paused,
+        "stop_event": detector.stop_event
+    })
 
 
 @app.route('/api/pause', methods=['POST'])
@@ -474,8 +485,8 @@ def pause_detection():
 
 @app.route('/api/stop', methods=['POST'])
 def stop_detection():
-    detector.stop_event = True
-    return jsonify({"status": "stopped"})
+    detector.stop()
+    return jsonify({"status": "stopped", "stop_event": detector.stop_event})
 
 
 @app.route('/api/results')
@@ -818,9 +829,12 @@ def asr():
 
             if asr_provider == "faster-whisper" or not recognized_text:
                 try:
-                    from faster_whisper import WhisperModel
-                    model = WhisperModel("small", device="cpu", compute_type="int8")
-                    segments, _ = model.transcribe(wav_path, language="zh", vad_filter=True)
+                    global _whisper_model
+                    if _whisper_model is None:
+                        from faster_whisper import WhisperModel
+                        _whisper_model = WhisperModel("small", device="cpu", compute_type="int8")
+                    
+                    segments, _ = _whisper_model.transcribe(wav_path, language="zh", vad_filter=True)
                     text_parts = []
                     for seg in segments:
                         text_parts.append(seg.text)

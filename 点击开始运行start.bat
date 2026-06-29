@@ -93,12 +93,13 @@ echo ==========================================
 echo   Three services will start in separate windows
 echo   Order: Flask -^> Spring Boot -^> Vue
 echo   Close each window to stop that service
+echo   Flask will bypass local HTTP(S) proxy for ARK API
 echo ==========================================
 echo.
 pause
 
 echo [Flask] Starting AI Vision + Digital Human (port 5000)...
-start "LEAR-CODE Flask" cmd /k "cd /d "%FLASK_DIR%" && python -u app.py"
+start "LEAR-CODE Flask" cmd /k "cd /d "%FLASK_DIR%" && set HTTP_PROXY= && set HTTPS_PROXY= && set ALL_PROXY= && set NO_PROXY=localhost,127.0.0.1,::1,ark.cn-beijing.volces.com,.volces.com && echo [Flask] Proxy disabled for ARK API requests. && python -u app.py"
 
 timeout /t 3 /nobreak >nul
 
